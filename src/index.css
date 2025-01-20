@@ -1,94 +1,72 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+/* index.css */
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Roboto', Arial, sans-serif;
+  background: linear-gradient(135deg, #0f2027, #2c5364); /* Fondo general */
+  overflow: hidden;
+  color: #f8fafc;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+html, body, #root {
+  height: 100%;
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
 }
 
-code {
-  background-color: #1a1a1a;
-  padding: 2px 4px;
-  margin: 0 4px;
-  border-radius: 4px;
+input, textarea {
+  font-family: inherit;
+  color: #f8fafc;
+}
+/* Transición fade para react-transition-group */
+/* Aparece por primera vez (si usas appear) */
+/* Para appear (primera vez) */
+.fade-appear {
+  opacity: 0;
+}
+.fade-appear.fade-appear-active {
+  opacity: 1;
+  transition: opacity 1000ms ease-in-out;
 }
 
-.card {
-  padding: 2em;
+/* Cuando entra una ruta nueva */
+.fade-enter {
+  opacity: 0;
+}
+.fade-enter.fade-enter-active {
+  opacity: 1;
+  transition: opacity 1000ms ease-in-out;
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Cuando sale la ruta actual */
+.fade-exit {
+  opacity: 1;
+}
+.fade-exit.fade-exit-active {
+  opacity: 0;
+  transition: opacity 1000ms ease-in-out;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+
+
+/* Puedes añadir aquí tus clases login-container, background, etc.
+   o las tienes en archivos CSS separados. Ejemplo rápido: */
+/* === Agrega esto al final de tu App.css === */
+
+/* Definición de la animación de "fade-in" */
+@keyframes fadeInStartup {
+  0% {
+    opacity: 0;
   }
-  a:hover {
-    color: #747bff;
+  100% {
+    opacity: 1;
   }
-  button {
-    background-color: #f9f9f9;
-  }
-  code {
-    background-color: #f9f9f9;
-  }
+}
+
+/* Aplica la animación a la clase principal de tu login */
+.login-container {
+  /* Mantén tus estilos actuales y agrega la animación: */
+  animation: fadeInStartup 1s ease-in-out forwards;
 }

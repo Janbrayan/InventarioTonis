@@ -1,52 +1,169 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Contenedor principal centrado */
+.login-container {
+  position: relative; /* Para posicionar .background en absoluto */
+  overflow: hidden;   /* Esconde excedentes si .background es mayor */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); /* Punto inicial */
+  margin: 0;
+  padding: 16px;
 }
 
-.logo-box {
-  position: relative;
-  height: 9em;
-}
-
-.logo {
+/* Fondo animado (posible paralaje) */
+.background {
   position: absolute;
-  left: calc(50% - 4.5em);
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  top: 0;
+  left: 0;
+  width: 200%;  
+  height: 200%;
+  z-index: -1;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  transition: transform 0.1s ease-out; /* Para el efecto de movimiento con el cursor */
+  animation: backgroundAnimation 30s infinite ease-in-out; /* Animación suave y larga */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .logo.electron {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Mensaje de bienvenida (animación de neón + bounce) */
+.welcome-message {
+  color: #3b82f6;
+  font-size: 36px; /* Tamaño más grande */
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 50px; /* Más espacio respecto al login-form */
+  letter-spacing: 2px;
+  text-shadow:
+    0 0 8px  #3b82f6,
+    0 0 16px #3b82f6,
+    0 0 24px #2563eb;
+  /* Dos animaciones simultáneas:
+     1) textNeon (parpadeo de neón)
+     2) bounce (suave "flotar")
+  */
+  animation:
+    textNeon 1.5s infinite alternate,
+    bounce   3s infinite ease-in-out;
 }
 
-.card {
-  padding: 2em;
+/* Formulario futurista con gradiente superior */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  max-width: 350px;
+  width: 90%;
+  padding: 24px;
+  border-radius: 20px;
+  background: linear-gradient(
+    to bottom,
+    rgba(59, 130, 246, 0.3),
+    rgba(30, 41, 59, 0.95)
+  );
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 4px 10px rgba(59, 130, 246, 0.4);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.read-the-docs {
-  color: #888;
+/* Título del formulario */
+.login-title {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 20px;
 }
 
-.flex-center {
+/* Inputs */
+.login-input-wrapper {
   display: flex;
   align-items: center;
-  justify-content: center;
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.login-input-wrapper input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  padding-left: 8px;
+  font-size: 16px;
+}
+
+.login-input-wrapper svg {
+  color: #3b82f6;
+  font-size: 24px;
+}
+
+/* Botón */
+.login-button {
+  background-color: #3b82f6;
+  color: #ffffff;
+  text-transform: uppercase;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  width: 100%;
+  transition: transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-button:hover {
+  background-color: #2563eb;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+}
+
+/* Animación del fondo a 3 etapas suaves */
+@keyframes backgroundAnimation {
+  0% {
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  }
+  50% {
+    background: linear-gradient(135deg, #162d38, #253f50, #325869);
+  }
+  100% {
+    background: linear-gradient(135deg, #1b2735, #283e51, #4b79a1);
+  }
+}
+
+/* Animación de neón */
+@keyframes textNeon {
+  0% {
+    text-shadow:
+      0 0 10px #3b82f6,
+      0 0 20px #3b82f6,
+      0 0 30px #3b82f6;
+  }
+  100% {
+    text-shadow:
+      0 0 20px #2563eb,
+      0 0 30px #2563eb,
+      0 0 40px #2563eb;
+  }
+}
+
+/* Animación de bounce (suave flotación) */
+@keyframes bounce {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
