@@ -45,13 +45,18 @@ declare global {
       updateLote: (loteData: any) => Promise<{ success: boolean }>;
       deleteLote: (id: number) => Promise<{ success: boolean }>;
 
-      // (Más si tienes Purchases, etc.)
-      getPurchases: () => Promise<any>; // o Purchase[]
+      // COMPRAS
+      getPurchases: () => Promise<any>;
       createPurchase: (purchaseData: any) => Promise<{ success: boolean }>;
-      updatePurchase: (purchaseData: any) => Promise<{ success: boolean }>; // si lo usas
+      updatePurchase: (purchaseData: any) => Promise<{ success: boolean }>;
       deletePurchase: (id: number) => Promise<{ success: boolean }>;
-      getDetallesByCompra: (compraId: number) => Promise<any>; // o DetalleCompra[]
+      getDetallesByCompra: (compraId: number) => Promise<any>;
 
+      // VENTAS (NUEVO)
+      getSales: () => Promise<any>;
+      createSale: (saleData: any) => Promise<{ success: boolean }>;
+      deleteSale: (id: number) => Promise<{ success: boolean }>;
+      getDetallesByVenta: (ventaId: number) => Promise<any>;
     };
   }
 }

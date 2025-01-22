@@ -8,6 +8,9 @@ import { ProductService } from './services/ProductService';
 import { PurchaseService } from './services/PurchaseService';
 import { LoteService } from './services/LoteService';
 
+// IMPORTA TAMBIÉN TU SALES SERVICE:
+import { SalesService } from './services/SalesService';
+
 export function setupIpcHandlers() {
 
   // ========== LOGIN ==========
@@ -257,6 +260,46 @@ export function setupIpcHandlers() {
     } catch (error) {
       console.error('Error delete-lote:', error);
       return { success: false };
+    }
+  });
+
+  // ========== SALES (encabezado) ==========
+  ipcMain.handle('get-sales', async () => {
+    try {
+      return await SalesService.getSales();
+    } catch (error) {
+      console.error('Error get-sales:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('create-sale', async (_event, saleData) => {
+    try {
+      return await SalesService.createSale(saleData);
+    } catch (error) {
+      console.error('Error create-sale:', error);
+      return { success: false };
+    }
+  });
+
+  ipcMain.handle('delete-sale', async (_event, id) => {
+    try {
+      // Si implementas un SalesService.deleteSale
+      // return await SalesService.deleteSale(id);
+      // Ejemplo de no implementado:
+      return { success: false, error: 'delete-sale not implemented' };
+    } catch (error) {
+      console.error('Error delete-sale:', error);
+      return { success: false };
+    }
+  });
+
+  ipcMain.handle('get-detalles-by-venta', async (_event, ventaId) => {
+    try {
+      return await SalesService.getDetallesByVentaId(ventaId);
+    } catch (error) {
+      console.error('Error get-detalles-by-venta:', error);
+      return [];
     }
   });
 }

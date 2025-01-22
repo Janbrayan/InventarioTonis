@@ -85,6 +85,29 @@ export interface FrontLote {
   activo?: boolean;
 }
 
+// === (Opcional) Interfaces de Venta en el front ===
+export interface FrontSale {
+  id?: number;
+  fecha?: string;
+  total?: number;
+  observaciones?: string;
+  detalles?: FrontDetalleVenta[];
+}
+export interface FrontDetalleVenta {
+  id?: number;
+  ventaId?: number;
+  productoId: number;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal?: number;
+  lote?: string;
+  fechaCaducidad?: string;
+
+  tipoContenedor?: 'unidad' | 'caja' | 'paquete';
+  unidadesPorContenedor?: number;
+  piezasVendidas?: number;
+}
+
 // Exponemos las funciones de IPC en `window.electronAPI`
 contextBridge.exposeInMainWorld('electronAPI', {
   // === LOGIN ===
@@ -128,4 +151,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createLote: (loteData: FrontLote) => ipcRenderer.invoke('create-lote', loteData),
   updateLote: (loteData: FrontLote & { id: number }) => ipcRenderer.invoke('update-lote', loteData),
   deleteLote: (id: number) => ipcRenderer.invoke('delete-lote', id),
+
+  // === SALES (Ventas) ===
+  getSales: () => ipcRenderer.invoke('get-sales'),
+  createSale: (saleData: FrontSale) => ipcRenderer.invoke('create-sale', saleData),
+  deleteSale: (id: number) => ipcRenderer.invoke('delete-sale', id),
+  getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId)
 });
