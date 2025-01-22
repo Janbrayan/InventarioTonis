@@ -37,7 +37,7 @@ import {
 interface Product {
   id: number;
   nombre: string;
-  // ... lo que uses adicional
+  // ... lo que uses adicional (precioVenta, codigoBarras, etc.)
 }
 
 interface Lote {
@@ -89,6 +89,20 @@ function ConfirmDialog({
       </DialogActions>
     </Dialog>
   );
+}
+
+/**
+ * Función para determinar el estado de stock en función del total de piezas.
+ * Ajusta los límites (p.ej. < 5 para "poco", < 15 para "normal", etc.) según tus necesidades.
+ */
+function getStockStatus(totalPiezas: number) {
+  if (totalPiezas < 5) {
+    return { label: 'Poco stock', color: 'red' };
+  } else if (totalPiezas < 15) {
+    return { label: 'Stock normal', color: 'orange' };
+  } else {
+    return { label: 'Alto stock', color: 'green' };
+  }
 }
 
 /** Componente principal */
@@ -153,7 +167,7 @@ export default function Inventario() {
     };
   });
 
-  // Toggle expand/collapse (solo uno abierto)
+  // Toggle expand/collapse (solo uno abierto a la vez)
   function toggleProductRow(prodId: number) {
     setOpenProductId((prev) => (prev === prodId ? null : prodId));
   }
@@ -177,6 +191,7 @@ export default function Inventario() {
     setCantidadActual(l.cantidadActual ?? 0);
     setOpenModal(true);
   }
+
   function handleCloseModal() {
     setOpenModal(false);
     setEditingLote(null);
@@ -193,7 +208,7 @@ export default function Inventario() {
     setConfirmOpen(false);
   }
 
-  // Guardar Lote
+  // Guardar Lote (crear o editar)
   async function handleSaveLote() {
     setOpenModal(false);
     const isEdit = !!editingLote;
@@ -317,13 +332,15 @@ export default function Inventario() {
                 {grouped.map(({ product, lotes: lotesDeEsteProd, totalLotes, totalPiezas }) => {
                   const isOpen = openProductId === product.id;
 
-                  // Info: "Leche 100 ml (2 lotes, 15 piezas)"
+                  // Info sobre lotes y piezas
                   const infoExtra = `(${totalLotes} lotes, ${totalPiezas} piezas)`;
+
+                  // Obtenemos estado de stock
+                  const { label: stockLabel, color: stockColor } = getStockStatus(totalPiezas);
 
                   return (
                     <React.Fragment key={product.id}>
-                      {/* Fila principal con el producto 
-                          (Hacemos onClick en toda la fila) */}
+                      {/* Fila principal con el producto */}
                       <TableRow
                         onClick={() => toggleProductRow(product.id)}
                         sx={{
@@ -338,12 +355,19 @@ export default function Inventario() {
                         </TableCell>
                         <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
                           {product.nombre}{' '}
-                          <Typography component="span" sx={{ color: '#fff', fontSize: '0.85rem' }}>
+                          <Typography component="span" sx={{ color: '#fff', fontSize: '0.85rem', ml: 1 }}>
                             {infoExtra}
+                          </Typography>
+                          {/* Estado de stock */}
+                          <Typography
+                            component="span"
+                            sx={{ color: stockColor, fontSize: '0.85rem', ml: 2, fontWeight: 'bold' }}
+                          >
+                            {stockLabel}
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ color: '#fff' }}>
-                          {/* Podrías poner un botón "Crear Lote para este prod" si quieres */}
+                          {/* Botón u opciones adicionales, si quieres */}
                         </TableCell>
                       </TableRow>
 
@@ -352,7 +376,10 @@ export default function Inventario() {
                         <TableCell style={{ padding: 0 }} colSpan={3}>
                           <Collapse in={isOpen} timeout="auto" unmountOnExit>
                             <Box sx={{ margin: 2 }}>
-                              <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 'bold', mb: 1 }}>
+                              <Typography
+                                variant="subtitle1"
+                                sx={{ color: '#fff', fontWeight: 'bold', mb: 1 }}
+                              >
                                 Lotes de {product.nombre}
                               </Typography>
                               <Table size="small">
@@ -390,7 +417,9 @@ export default function Inventario() {
                                             ? new Date(l.fechaCaducidad).toLocaleDateString()
                                             : '—'}
                                         </TableCell>
-                                        <TableCell sx={{ color: '#fff' }}>{l.cantidadActual}</TableCell>
+                                        <TableCell sx={{ color: '#fff' }}>
+                                          {l.cantidadActual}
+                                        </TableCell>
                                         <TableCell sx={{ color: '#fff' }}>
                                           {l.updatedAt
                                             ? new Date(l.updatedAt).toLocaleString()
@@ -404,7 +433,7 @@ export default function Inventario() {
                                             sx={{ mr: 1, fontWeight: 'bold' }}
                                             startIcon={<EditIcon />}
                                             onClick={(e) => {
-                                              e.stopPropagation(); // evita colapsar la fila al hacer clic
+                                              e.stopPropagation(); // evita colapsar la fila
                                               handleOpenEdit(l);
                                             }}
                                           >

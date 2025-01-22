@@ -24,15 +24,19 @@ export interface Provider {
 }
 
 export class ProviderService {
-
+  /**
+   * Obtiene la lista de proveedores.
+   */
   static async getProviders(): Promise<Provider[]> {
     try {
       const rows = db.prepare(`
-        SELECT id, nombre, contacto, telefono, email, activo, createdAt, updatedAt
+        SELECT
+          id, nombre, contacto, telefono, email,
+          activo, createdAt, updatedAt
         FROM providers
       `).all() as DBProvider[];
 
-      return rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         nombre: r.nombre,
         contacto: r.contacto || undefined,
@@ -40,19 +44,23 @@ export class ProviderService {
         email: r.email || undefined,
         activo: !!r.activo,
         createdAt: r.createdAt,
-        updatedAt: r.updatedAt
+        updatedAt: r.updatedAt,
       }));
-    } catch (err) {
-      console.error('Error getProviders:', err);
+    } catch (error) {
+      console.error('Error getProviders:', error);
       return [];
     }
   }
 
+  /**
+   * Crea un nuevo proveedor.
+   */
   static async createProvider(prov: Provider): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
       db.prepare(`
-        INSERT INTO providers (nombre, contacto, telefono, email, activo, createdAt, updatedAt)
+        INSERT INTO providers
+          (nombre, contacto, telefono, email, activo, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(
         prov.nombre,
@@ -64,12 +72,15 @@ export class ProviderService {
         now
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error createProvider:', err);
+    } catch (error) {
+      console.error('Error createProvider:', error);
       return { success: false };
     }
   }
 
+  /**
+   * Actualiza un proveedor existente.
+   */
   static async updateProvider(prov: Provider & { id: number }): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -92,18 +103,21 @@ export class ProviderService {
         prov.id
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error updateProvider:', err);
+    } catch (error) {
+      console.error('Error updateProvider:', error);
       return { success: false };
     }
   }
 
+  /**
+   * Elimina un proveedor por su ID.
+   */
   static async deleteProvider(id: number): Promise<{ success: boolean }> {
     try {
       db.prepare('DELETE FROM providers WHERE id = ?').run(id);
       return { success: true };
-    } catch (err) {
-      console.error('Error deleteProvider:', err);
+    } catch (error) {
+      console.error('Error deleteProvider:', error);
       return { success: false };
     }
   }

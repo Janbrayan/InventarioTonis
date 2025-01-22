@@ -26,18 +26,20 @@ export interface Lote {
 }
 
 export class LoteService {
-
-  // LISTAR LOTES
+  /**
+   * Obtiene la lista completa de lotes.
+   */
   static async getLotes(): Promise<Lote[]> {
     try {
       const rows = db.prepare(`
-        SELECT id, productoId, detalleCompraId, lote,
-               fechaCaducidad, cantidadActual, activo,
-               createdAt, updatedAt
+        SELECT
+          id, productoId, detalleCompraId, lote,
+          fechaCaducidad, cantidadActual, activo,
+          createdAt, updatedAt
         FROM lotes
       `).all() as DBLote[];
 
-      return rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         productoId: r.productoId,
         detalleCompraId: r.detalleCompraId || undefined,
@@ -46,15 +48,17 @@ export class LoteService {
         cantidadActual: r.cantidadActual,
         activo: !!r.activo,
         createdAt: r.createdAt,
-        updatedAt: r.updatedAt
+        updatedAt: r.updatedAt,
       }));
-    } catch (err) {
-      console.error('Error getLotes:', err);
+    } catch (error) {
+      console.error('Error getLotes:', error);
       return [];
     }
   }
 
-  // CREAR LOTE
+  /**
+   * Crea un nuevo lote.
+   */
   static async createLote(l: Lote): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -74,13 +78,15 @@ export class LoteService {
         now
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error createLote:', err);
+    } catch (error) {
+      console.error('Error createLote:', error);
       return { success: false };
     }
   }
 
-  // ACTUALIZAR LOTE
+  /**
+   * Actualiza un lote existente.
+   */
   static async updateLote(l: Lote & { id: number }): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -104,19 +110,21 @@ export class LoteService {
         l.id
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error updateLote:', err);
+    } catch (error) {
+      console.error('Error updateLote:', error);
       return { success: false };
     }
   }
 
-  // ELIMINAR LOTE
+  /**
+   * Elimina un lote por su ID.
+   */
   static async deleteLote(id: number): Promise<{ success: boolean }> {
     try {
       db.prepare('DELETE FROM lotes WHERE id = ?').run(id);
       return { success: true };
-    } catch (err) {
-      console.error('Error deleteLote:', err);
+    } catch (error) {
+      console.error('Error deleteLote:', error);
       return { success: false };
     }
   }

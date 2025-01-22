@@ -2,10 +2,6 @@
 import db from '../db';
 import bcrypt from 'bcrypt';
 
-/**
- * Interfaz que describe la fila de la tabla `users`.
- * Ajusta según tus columnas reales en la base de datos.
- */
 interface DBUser {
   id: number;
   username: string;
@@ -14,32 +10,24 @@ interface DBUser {
   // ejemplo: activo: number;
 }
 
-/**
- * Estructura que devolvemos tras el login:
- */
 export interface LoginUserResult {
   success: boolean;
   role?: string;
   username?: string;
 }
 
-/**
- * Interfaz de usuario que manejamos en el frontend (y para crear/editar).
- */
 interface User {
   id?: number;
   username: string;
-  password?: string; // si se va a crear/editar password
+  password?: string; // para creaciones/ediciones
   role: string;
-  // activo?: boolean; 
+  // activo?: boolean; // si lo necesitas
 }
 
-/**
- * Clase de servicio para la lógica de base de datos
- */
 export class UserService {
-
-  // === LOGIN ===
+  /**
+   * Inicia sesión: verifica usuario/contraseña y retorna datos básicos.
+   */
   static async loginUser(username: string, password: string): Promise<LoginUserResult> {
     try {
       const row = db
@@ -60,36 +48,39 @@ export class UserService {
         role: row.role,
         username: row.username,
       };
-
-    } catch (err) {
-      console.error('Error loginUser:', err);
+    } catch (error) {
+      console.error('Error loginUser:', error);
       return { success: false };
     }
   }
 
-  // === LISTAR USUARIOS ===
+  /**
+   * Obtiene una lista de todos los usuarios (oculta el passwordHash).
+   */
   static async getUsers(): Promise<User[]> {
     try {
-      const rows = db.prepare('SELECT id, username, role FROM users').all() as DBUser[];
+      const rows = db.prepare(`
+        SELECT id, username, role
+        FROM users
+      `).all() as DBUser[];
 
-      // Mapeamos a la interfaz "User"
-      const userList: User[] = rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         username: r.username,
         role: r.role,
       }));
-      return userList;
-
-    } catch (err) {
-      console.error('Error getUsers:', err);
+    } catch (error) {
+      console.error('Error getUsers:', error);
       return [];
     }
   }
 
-  // === CREAR USUARIO ===
+  /**
+   * Crea un nuevo usuario con un password por defecto si no se provee.
+   */
   static async createUser(newUser: User): Promise<{ success: boolean }> {
     try {
-      const rawPassword = newUser.password || '123456'; // Password por defecto
+      const rawPassword = newUser.password || '123456';
       const passwordHash = await bcrypt.hash(rawPassword, 10);
 
       db.prepare(`
@@ -102,14 +93,15 @@ export class UserService {
       );
 
       return { success: true };
-
-    } catch (err) {
-      console.error('Error createUser:', err);
+    } catch (error) {
+      console.error('Error createUser:', error);
       return { success: false };
     }
   }
 
-  // === ACTUALIZAR USUARIO ===
+  /**
+   * Actualiza los datos de un usuario (username, role y opcionalmente el password).
+   */
   static async updateUser(user: User & { id: number }): Promise<{ success: boolean }> {
     try {
       let setClause = 'username = ?, role = ?';
@@ -122,12 +114,7 @@ export class UserService {
         values.push(passwordHash);
       }
 
-      // Ejemplo si tu tabla tuviera "activo"
-      // setClause += ', activo = ?';
-      // values.push(user.activo ? 1 : 0);
-
-      values.push(user.id); // Para el WHERE
-
+      values.push(user.id); // ID para el WHERE
       const sql = `
         UPDATE users
         SET ${setClause}
@@ -136,25 +123,26 @@ export class UserService {
       db.prepare(sql).run(...values);
 
       return { success: true };
-
-    } catch (err) {
-      console.error('Error updateUser:', err);
+    } catch (error) {
+      console.error('Error updateUser:', error);
       return { success: false };
     }
   }
 
-  // === ELIMINAR USUARIO (o Soft delete) ===
+  /**
+   * Elimina un usuario por su ID.
+   * Puedes cambiar a "soft delete" si prefieres no borrarlo físicamente.
+   */
   static async deleteUser(id: number): Promise<{ success: boolean }> {
     try {
       // Ejemplo soft-delete:
       // db.prepare(`UPDATE users SET activo = 0 WHERE id = ?`).run(id);
 
-      // Ejemplo DELETE definitivo:
+      // DELETE definitivo:
       db.prepare('DELETE FROM users WHERE id = ?').run(id);
       return { success: true };
-
-    } catch (err) {
-      console.error('Error deleteUser:', err);
+    } catch (error) {
+      console.error('Error deleteUser:', error);
       return { success: false };
     }
   }

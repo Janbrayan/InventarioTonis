@@ -18,7 +18,9 @@ export interface Category {
 }
 
 export class CategoryService {
-
+  /**
+   * Obtiene la lista de categorías.
+   */
   static async getCategories(): Promise<Category[]> {
     try {
       const rows = db.prepare(`
@@ -26,19 +28,22 @@ export class CategoryService {
         FROM categories
       `).all() as DBCategory[];
 
-      return rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         nombre: r.nombre,
         activo: !!r.activo,
         createdAt: r.createdAt,
-        updatedAt: r.updatedAt
+        updatedAt: r.updatedAt,
       }));
-    } catch (err) {
-      console.error('Error getCategories:', err);
+    } catch (error) {
+      console.error('Error getCategories:', error);
       return [];
     }
   }
 
+  /**
+   * Crea una nueva categoría.
+   */
   static async createCategory(cat: Category): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -52,12 +57,15 @@ export class CategoryService {
         now
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error createCategory:', err);
+    } catch (error) {
+      console.error('Error createCategory:', error);
       return { success: false };
     }
   }
 
+  /**
+   * Actualiza los datos de una categoría existente.
+   */
   static async updateCategory(cat: Category & { id: number }): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -72,20 +80,21 @@ export class CategoryService {
         cat.id
       );
       return { success: true };
-    } catch (err) {
-      console.error('Error updateCategory:', err);
+    } catch (error) {
+      console.error('Error updateCategory:', error);
       return { success: false };
     }
   }
 
+  /**
+   * Elimina una categoría por su ID.
+   */
   static async deleteCategory(id: number): Promise<{ success: boolean }> {
     try {
-      // Borrado total:
       db.prepare('DELETE FROM categories WHERE id = ?').run(id);
-
       return { success: true };
-    } catch (err) {
-      console.error('Error deleteCategory:', err);
+    } catch (error) {
+      console.error('Error deleteCategory:', error);
       return { success: false };
     }
   }

@@ -1,4 +1,3 @@
-// electron/preload/preload.ts
 import { contextBridge, ipcRenderer } from 'electron';
 
 // ===== Tipos previos de Login/User
@@ -17,7 +16,7 @@ export interface FrontUser {
   activo?: boolean;
 }
 
-// ===== Tipos básicos para Categoría, Proveedor, Producto, Compras, Lotes, etc. (opcionales)
+// ===== Tipos básicos para Categoría, Proveedor, Producto, Compras, Lotes, etc.
 export interface FrontCategory {
   id?: number;
   nombre: string;
@@ -40,6 +39,10 @@ export interface FrontProduct {
   codigoBarras?: string;
   activo?: boolean;
 }
+
+/**
+ * Interfaz del encabezado de la compra en el front.
+ */
 export interface FrontPurchase {
   id?: number;
   proveedorId: number;
@@ -48,6 +51,11 @@ export interface FrontPurchase {
   observaciones?: string;
   detalles?: FrontDetalleCompra[];
 }
+
+/**
+ * Interfaz del detalle de la compra:
+ * Aquí agregamos los nuevos campos que manejas en tu lógica de contenedores.
+ */
 export interface FrontDetalleCompra {
   id?: number;
   compraId?: number;
@@ -57,7 +65,16 @@ export interface FrontDetalleCompra {
   subtotal?: number;
   lote?: string;
   fechaCaducidad?: string;
+
+  // === Campos opcionales de contenedor ===
+  tipoContenedor?: 'unidad' | 'caja' | 'paquete';
+  unidadesPorContenedor?: number;
+  piezasIngresadas?: number; // Si deseas enviarlo también
 }
+
+/**
+ * Interfaz para Lotes
+ */
 export interface FrontLote {
   id?: number;
   productoId: number;
@@ -68,6 +85,7 @@ export interface FrontLote {
   activo?: boolean;
 }
 
+// Exponemos las funciones de IPC en `window.electronAPI`
 contextBridge.exposeInMainWorld('electronAPI', {
   // === LOGIN ===
   loginUser: async (username: string, password: string): Promise<LoginUserResponse> => {

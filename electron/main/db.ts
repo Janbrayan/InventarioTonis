@@ -102,18 +102,26 @@ CREATE TABLE IF NOT EXISTS purchases (
 `);
 
 // ==================================
-//  Tabla "detail_compras" (detalle de compras)
+//   Tabla "detail_compras" (detalle de compras)
+//    -- ACTUALIZADA en una sola sentencia --
 // ==================================
 db.exec(`
 CREATE TABLE IF NOT EXISTS detail_compras (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   compraId INTEGER NOT NULL,
   productoId INTEGER NOT NULL,
+
   cantidad REAL NOT NULL DEFAULT 0,
   precioUnitario REAL NOT NULL DEFAULT 0,
   subtotal REAL NOT NULL DEFAULT 0,
-  lote TEXT, -- opcional: lote
-  fechaCaducidad TEXT, -- opcional
+
+  lote TEXT,            -- opcional: lote
+  fechaCaducidad TEXT,  -- opcional
+
+  tipoContenedor TEXT,                  -- 'unidad' | 'caja' | 'paquete'
+  unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
+  piezasIngresadas REAL DEFAULT 0,      -- total de piezas que realmente ingresan
+
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
 
@@ -138,9 +146,8 @@ CREATE TABLE IF NOT EXISTS lotes (
   updatedAt TEXT NOT NULL,
 
   FOREIGN KEY (productoId) REFERENCES products(id)
-  -- Si deseas referencia a detail_compras:
-  --FOREIGN KEY (detalleCompraId) REFERENCES detail_compras(id)
 );
 `);
 
+// Exportamos la instancia de la DB
 export default db;

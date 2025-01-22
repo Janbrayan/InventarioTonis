@@ -1,6 +1,6 @@
+// electron/main/services/PurchaseService.ts
 import db from '../db';
 
-// Interfaces para la BD
 interface DBPurchase {
   id: number;
   proveedorId: number;
@@ -20,11 +20,17 @@ interface DBDetalleCompra {
   subtotal: number;
   lote: string | null;
   fechaCaducidad: string | null;
+  // tipoContenedor?: string | null;        (Si lo definiste)
+  // unidadesPorContenedor?: number | null;
+  // piezasIngresadas?: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
-// Estructuras compartidas con el front
+/**
+ * Interfaz que representa el encabezado de la compra
+ * junto a los detalles que vienen desde el frontend.
+ */
 export interface Purchase {
   id?: number;
   proveedorId: number;
@@ -33,54 +39,66 @@ export interface Purchase {
   observaciones?: string;
   createdAt?: string;
   updatedAt?: string;
-  detalles?: DetalleCompra[]; // para enviar/recibir
+  detalles?: DetalleCompra[];
 }
 
+/**
+ * Detalle de la compra, con los campos de contenedores.
+ */
 export interface DetalleCompra {
   id?: number;
   compraId?: number;
   productoId: number;
-  cantidad: number;
+  cantidad: number;            // Cant. de cajas/paquetes/unidades
   precioUnitario: number;
   subtotal?: number;
   lote?: string;
   fechaCaducidad?: string;
   createdAt?: string;
   updatedAt?: string;
+
+  tipoContenedor?: 'unidad' | 'caja' | 'paquete';
+  unidadesPorContenedor?: number;
+  piezasIngresadas?: number;   // total de piezas resultantes
 }
 
 export class PurchaseService {
-
-  // LISTAR COMPRAS (encabezado)
+  /**
+   * Obtiene todas las compras (encabezado).
+   */
   static async getPurchases(): Promise<Purchase[]> {
     try {
       const rows = db.prepare(`
-        SELECT id, proveedorId, fecha, total, observaciones, createdAt, updatedAt
+        SELECT
+          id, proveedorId, fecha, total, observaciones,
+          createdAt, updatedAt
         FROM purchases
       `).all() as DBPurchase[];
 
-      return rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         proveedorId: r.proveedorId,
         fecha: r.fecha,
         total: r.total,
         observaciones: r.observaciones || undefined,
         createdAt: r.createdAt,
-        updatedAt: r.updatedAt
+        updatedAt: r.updatedAt,
       }));
-    } catch (err) {
-      console.error('Error getPurchases:', err);
+    } catch (error) {
+      console.error('Error getPurchases:', error);
       return [];
     }
   }
 
-  // CREAR COMPRA + DETALLES + CREAR LOTES
+  /**
+   * Crea una compra (encabezado + detalles + lotes) en una transacción,
+   * calculando correctamente la cantidad total de piezas si es "caja" o "paquete".
+   */
   static async createPurchase(purchase: Purchase): Promise<{ success: boolean }> {
     const now = new Date().toISOString();
 
-    // Usamos una transacción para que si algo falla, se haga rollback
     const tx = db.transaction(() => {
-      // 1) Insertar encabezado en 'purchases'
+      // 1) Insertar el encabezado en 'purchases'
       const result = db.prepare(`
         INSERT INTO purchases (proveedorId, fecha, total, observaciones, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -94,16 +112,40 @@ export class PurchaseService {
       );
       const compraId = result.lastInsertRowid as number;
 
-      // 2) Insertar renglones en 'detail_compras'
+      // 2) Insertar detalles en 'detail_compras' (incluimos tipoContenedor, unidPorCont, piezasIngresadas)
       if (purchase.detalles && purchase.detalles.length > 0) {
         const stmtDetalle = db.prepare(`
           INSERT INTO detail_compras
-            (compraId, productoId, cantidad, precioUnitario, subtotal, lote, fechaCaducidad, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (compraId, productoId, cantidad, precioUnitario, subtotal,
+             lote, fechaCaducidad,
+             tipoContenedor, unidadesPorContenedor, piezasIngresadas,
+             createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const det of purchase.detalles) {
-          const sub = det.cantidad * det.precioUnitario;
+          // Calculamos el subtotal. 
+          // - "paquete": cant * unidPorCont * precio
+          // - "caja" o "unidad": cant * precio (depende de tu lógica de negocio)
+          let sub = det.cantidad * det.precioUnitario;
+          if (det.tipoContenedor === 'paquete') {
+            const upc = det.unidadesPorContenedor ?? 1;
+            sub = det.cantidad * upc * det.precioUnitario;
+          }
+          // Si quieres que "caja" se comporte igual a "paquete", 
+          // descomenta:
+          // else if (det.tipoContenedor === 'caja') {
+          //   const upc = det.unidadesPorContenedor ?? 1;
+          //   sub = det.cantidad * upc * det.precioUnitario;
+          // }
+
+          // Calculamos piezasIngresadas:
+          let piezas = det.cantidad;
+          if (det.tipoContenedor === 'paquete' || det.tipoContenedor === 'caja') {
+            const upc = det.unidadesPorContenedor ?? 1;
+            piezas = det.cantidad * upc;
+          }
+
           stmtDetalle.run(
             compraId,
             det.productoId,
@@ -112,28 +154,39 @@ export class PurchaseService {
             sub,
             det.lote ?? null,
             det.fechaCaducidad ?? null,
+            det.tipoContenedor ?? null,
+            det.unidadesPorContenedor ?? 1,
+            piezas,   // piezasIngresadas
             now,
             now
           );
         }
       }
 
-      // 3) CREAR LOTES en la tabla 'lotes' para reflejar el inventario
-      //    Por cada detalle, hacemos un INSERT en 'lotes'.
+      // 3) Insertar en 'lotes'
+      //    Calculamos la "cantidadActual" multiplicando si es caja/paquete.
       if (purchase.detalles && purchase.detalles.length > 0) {
         const stmtLote = db.prepare(`
           INSERT INTO lotes
-            (productoId, lote, fechaCaducidad, cantidadActual, activo, createdAt, updatedAt)
+            (productoId, lote, fechaCaducidad, cantidadActual,
+             activo, createdAt, updatedAt)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const det of purchase.detalles) {
+          // Cantidad real de piezas al inventario
+          let realCantidad = det.cantidad;
+          if (det.tipoContenedor === 'paquete' || det.tipoContenedor === 'caja') {
+            const upc = det.unidadesPorContenedor ?? 1;
+            realCantidad = det.cantidad * upc;
+          }
+
           stmtLote.run(
             det.productoId,
             det.lote ?? null,
             det.fechaCaducidad ?? null,
-            det.cantidad,  // sumamos las unidades que compramos
-            1,             // activo
+            realCantidad,   // cantidad total
+            1,              // activo = true
             now,
             now
           );
@@ -142,25 +195,31 @@ export class PurchaseService {
     });
 
     try {
-      tx(); // ejecuta la transacción
+      tx();
       return { success: true };
-    } catch (err) {
-      console.error('Error createPurchase:', err);
+    } catch (error) {
+      console.error('Error createPurchase:', error);
       return { success: false };
     }
   }
 
-  // OBTENER DETALLE DE UNA COMPRA
+  /**
+   * OBTENER DETALLES de una compra
+   * (si tu tabla detail_compras tiene estas columnas, inclúyelas en el SELECT).
+   */
   static async getDetallesByCompraId(compraId: number): Promise<DetalleCompra[]> {
     try {
       const rows = db.prepare(`
-        SELECT id, compraId, productoId, cantidad, precioUnitario, subtotal,
-               lote, fechaCaducidad, createdAt, updatedAt
+        SELECT
+          id, compraId, productoId, cantidad, precioUnitario,
+          subtotal, lote, fechaCaducidad,
+          tipoContenedor, unidadesPorContenedor, piezasIngresadas,
+          createdAt, updatedAt
         FROM detail_compras
         WHERE compraId = ?
-      `).all(compraId) as DBDetalleCompra[];
+      `).all(compraId) as any[]; // Podrías definir un DBDetalleCompra ampliado
 
-      return rows.map(r => ({
+      return rows.map((r) => ({
         id: r.id,
         compraId: r.compraId,
         productoId: r.productoId,
@@ -169,16 +228,22 @@ export class PurchaseService {
         subtotal: r.subtotal,
         lote: r.lote ?? undefined,
         fechaCaducidad: r.fechaCaducidad ?? undefined,
+        tipoContenedor: r.tipoContenedor ?? undefined,
+        unidadesPorContenedor: r.unidadesPorContenedor ?? undefined,
+        piezasIngresadas: r.piezasIngresadas ?? undefined,
         createdAt: r.createdAt,
-        updatedAt: r.updatedAt
+        updatedAt: r.updatedAt,
       }));
-    } catch (err) {
-      console.error('Error getDetallesByCompraId:', err);
+    } catch (error) {
+      console.error('Error getDetallesByCompraId:', error);
       return [];
     }
   }
 
-  // ACTUALIZAR ENCABEZADO (sin tocar detalles)
+  /**
+   * Actualiza SOLO el encabezado de la compra.
+   * (No actualiza detalles ni lotes.)
+   */
   static async updatePurchase(purchase: Purchase & { id: number }): Promise<{ success: boolean }> {
     try {
       const now = new Date().toISOString();
@@ -196,25 +261,29 @@ export class PurchaseService {
       );
 
       return { success: true };
-    } catch (err) {
-      console.error('Error updatePurchase:', err);
+    } catch (error) {
+      console.error('Error updatePurchase:', error);
       return { success: false };
     }
   }
 
-  // ELIMINAR COMPRA (y detalles)
+  /**
+   * Elimina compra + detalles (y podrías eliminar lotes si aplica).
+   */
   static async deletePurchase(id: number): Promise<{ success: boolean }> {
     const tx = db.transaction(() => {
-      // Primero borrar los detalles
       db.prepare('DELETE FROM detail_compras WHERE compraId = ?').run(id);
-      // Luego borrar la compra
+      // (Opcional) Borrar lotes creados por esta compra si así lo deseas
+      // db.prepare('DELETE FROM lotes WHERE ??? = ?').run(...);
+
       db.prepare('DELETE FROM purchases WHERE id = ?').run(id);
     });
+
     try {
       tx();
       return { success: true };
-    } catch (err) {
-      console.error('Error deletePurchase:', err);
+    } catch (error) {
+      console.error('Error deletePurchase:', error);
       return { success: false };
     }
   }
