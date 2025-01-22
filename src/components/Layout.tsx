@@ -15,7 +15,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import BuildIcon from '@mui/icons-material/Build'; // Para “Gestión de Productos”
+import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -97,7 +97,7 @@ export default function Layout() {
                 <ul className="submenu">
                   <li>
                     <Link to="/app/productos/gestion" className="submenu-link">
-                      <BuildIcon style={{ fontSize: 16, marginRight: 8 }} />
+                      <InventoryRoundedIcon style={{ fontSize: 16, marginRight: 8 }} />
                       Gestión de Productos
                     </Link>
                   </li>
@@ -117,6 +117,20 @@ export default function Layout() {
                     <Link to="/app/productos/estadisticas" className="submenu-link">
                       <BarChartIcon style={{ fontSize: 16, marginRight: 8 }} />
                       Estadísticas
+                    </Link>
+                  </li>
+                  {/* NUEVO: “Proveedores” */}
+                  <li>
+                    <Link to="/app/productos/proveedores" className="submenu-link">
+                      <CategoryIcon style={{ fontSize: 16, marginRight: 8 }} />
+                      Proveedores
+                    </Link>
+                  </li>
+                  {/* NUEVO: “Compras” */}
+                  <li>
+                    <Link to="/app/productos/compras" className="submenu-link">
+                      <ShoppingCartIcon style={{ fontSize: 16, marginRight: 8 }} />
+                      Compras
                     </Link>
                   </li>
                 </ul>

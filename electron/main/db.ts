@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 
 // 1. Determina la carpeta donde se guardará el archivo .db
-//    Por simplicidad, lo ponemos en la carpeta actual (o en userData).
 const userDataPath = process.env.PORTABLE_EXECUTABLE_DIR || process.cwd();
 
 // Asegura que la carpeta exista
@@ -18,29 +17,130 @@ console.log('Base de datos en:', dbPath);
 // 3. Conexión a SQLite con better-sqlite3
 const db = new Database(dbPath);
 
-// 4. Crea la tabla "users" si no existe
+// ==================================
+//   Tabla "users" (ya existente)
+// ==================================
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   passwordHash TEXT NOT NULL,
-  role TEXT NOT NULL -- "admin", "worker", etc.
+  role TEXT NOT NULL
 );
 `);
 
-// 5. Inserta un usuario "admin" por defecto con contraseña hasheada (bcrypt).
-//    Reemplaza el hash con tu propio hash real.
+// Usuario admin por defecto
 const defaultAdminHash = '$2b$10$nbGNjSKlUNY1Va1JnqJWfewthAYTS7gvX7an5k4RPaFRrbQHoQ3N2';
 db.exec(`
 INSERT OR IGNORE INTO users (id, username, passwordHash, role)
 VALUES (1, 'admin', '${defaultAdminHash}', 'admin');
 `);
 
-/*
-  Nota: Si deseas cambiar la pass:
-    - Genera tu propio hash con "npx bcrypt-cli" (o en Node REPL con bcrypt).
-    - Pega ese hash en defaultAdminHash y listo.
-*/
+// ==================================
+//   Tabla "categories"
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  activo INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+`);
 
-// 6. Exportamos la conexión para usarla en otro archivo
+// ==================================
+//   Tabla "providers" (proveedores)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS providers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  contacto TEXT,
+  telefono TEXT,
+  email TEXT,
+  activo INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+`);
+
+// ==================================
+//   Tabla "products"
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  categoriaId INTEGER,
+  precioCompra REAL DEFAULT 0,
+  precioVenta REAL DEFAULT 0,
+  codigoBarras TEXT,
+  activo INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (categoriaId) REFERENCES categories(id)
+);
+`);
+
+// ==================================
+//   Tabla "purchases" (encabezado de compra)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS purchases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  proveedorId INTEGER NOT NULL,
+  fecha TEXT NOT NULL,
+  total REAL DEFAULT 0,
+  observaciones TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (proveedorId) REFERENCES providers(id)
+);
+`);
+
+// ==================================
+//  Tabla "detail_compras" (detalle de compras)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS detail_compras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  compraId INTEGER NOT NULL,
+  productoId INTEGER NOT NULL,
+  cantidad REAL NOT NULL DEFAULT 0,
+  precioUnitario REAL NOT NULL DEFAULT 0,
+  subtotal REAL NOT NULL DEFAULT 0,
+  lote TEXT, -- opcional: lote
+  fechaCaducidad TEXT, -- opcional
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (compraId) REFERENCES purchases(id),
+  FOREIGN KEY (productoId) REFERENCES products(id)
+);
+`);
+
+// ==================================
+//   Tabla "lotes" (inventario por lote)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS lotes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  productoId INTEGER NOT NULL,
+  detalleCompraId INTEGER, -- opcional (si quieres enlazar con detail_compras)
+  lote TEXT,
+  fechaCaducidad TEXT,
+  cantidadActual REAL NOT NULL DEFAULT 0,
+  activo INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (productoId) REFERENCES products(id)
+  -- Si deseas referencia a detail_compras:
+  --FOREIGN KEY (detalleCompraId) REFERENCES detail_compras(id)
+);
+`);
+
 export default db;

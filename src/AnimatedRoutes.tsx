@@ -6,6 +6,11 @@ import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Usuarios from './components/Usuarios';
+import Proveedores from './components/Proveedores';
+import GestionProductos from './components/GestionPorductos';
+import Categorias from './components/Categorias';
+import Inventario from './components/Inventario';
+import Compras from './components/Compras';
 
 // tus placeholders...
 // GestionProductos, Categorias, etc.
@@ -59,10 +64,12 @@ export default function AppRoutes() {
 
             {/* Productos */}
             <Route path="productos">
-              <Route path="gestion" /* ... */ />
-              <Route path="categorias" /* ... */ />
-              <Route path="inventario" /* ... */ />
+              <Route path="gestion" element={<GestionProductos/>} />
+              <Route path="categorias" element={<Categorias/>} />
+              <Route path="inventario" element={<Inventario/>} />
               <Route path="estadisticas" /* ... */ />
+              <Route path='proveedores' element={<Proveedores/>}/>
+              <Route path='compras' element={<Compras/>}/>
             </Route>
 
             {/* Ventas */}
