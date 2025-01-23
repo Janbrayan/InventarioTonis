@@ -1,14 +1,11 @@
 // electron/main/ipcHandlers.ts
 import { ipcMain } from 'electron';
 import { UserService } from './services/UserService';
-
 import { CategoryService } from './services/CategoryService';
 import { ProviderService } from './services/ProviderService';
 import { ProductService } from './services/ProductService';
 import { PurchaseService } from './services/PurchaseService';
 import { LoteService } from './services/LoteService';
-
-// IMPORTA TAMBIÉN TU SALES SERVICE:
 import { SalesService } from './services/SalesService';
 
 export function setupIpcHandlers() {
@@ -216,7 +213,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // DETALLES DE UNA COMPRA (para consultarlo en front)
+  // DETALLES DE UNA COMPRA
   ipcMain.handle('get-detalles-by-compra', async (_event, compraId) => {
     try {
       return await PurchaseService.getDetallesByCompraId(compraId);
@@ -263,6 +260,17 @@ export function setupIpcHandlers() {
     }
   });
 
+  // NUEVO: Descuento de lotes por consumo interno / merma
+  ipcMain.handle('descontar-por-consumo', async (_event, data) => {
+    try {
+      // data = { loteId, cantidad, motivo? }
+      return await LoteService.descontarPorConsumo(data);
+    } catch (error) {
+      console.error('Error descontar-por-consumo IPC:', error);
+      return { success: false };
+    }
+  });
+
   // ========== SALES (encabezado) ==========
   ipcMain.handle('get-sales', async () => {
     try {
@@ -283,15 +291,8 @@ export function setupIpcHandlers() {
   });
 
   ipcMain.handle('delete-sale', async (_event, id) => {
-    try {
-      // Si implementas un SalesService.deleteSale
-      // return await SalesService.deleteSale(id);
-      // Ejemplo de no implementado:
-      return { success: false, error: 'delete-sale not implemented' };
-    } catch (error) {
-      console.error('Error delete-sale:', error);
-      return { success: false };
-    }
+    // Ejemplo, si no lo has implementado:
+    return { success: false, error: 'delete-sale not implemented' };
   });
 
   ipcMain.handle('get-detalles-by-venta', async (_event, ventaId) => {

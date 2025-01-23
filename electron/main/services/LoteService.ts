@@ -25,7 +25,16 @@ export interface Lote {
   updatedAt?: string;
 }
 
+/** Interfaz para el método de consumo interno */
+export interface ConsumoData {
+  loteId: number;
+  cantidad: number;
+  motivo?: string; // opcional
+}
+
+/** LoteService: Manejo CRUD de 'lotes' + método de 'consumo interno' */
 export class LoteService {
+
   /**
    * Obtiene la lista completa de lotes.
    */
@@ -85,7 +94,7 @@ export class LoteService {
   }
 
   /**
-   * Actualiza un lote existente.
+   * Actualiza un lote existente (soft-delete incluido si 'activo=false').
    */
   static async updateLote(l: Lote & { id: number }): Promise<{ success: boolean }> {
     try {
@@ -117,7 +126,7 @@ export class LoteService {
   }
 
   /**
-   * Elimina un lote por su ID.
+   * Elimina un lote por su ID (borrado físico). Usar con cautela.
    */
   static async deleteLote(id: number): Promise<{ success: boolean }> {
     try {
@@ -125,6 +134,51 @@ export class LoteService {
       return { success: true };
     } catch (error) {
       console.error('Error deleteLote:', error);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Registra un consumo interno (merma, muestras, etc.) para el lote,
+   * insertando un registro en 'consumos_internos' y descontando stock.
+   */
+  static async descontarPorConsumo(data: ConsumoData): Promise<{ success: boolean }> {
+    try {
+      const now = new Date().toISOString();
+
+      // 1) Insertar un registro en "consumos_internos"
+      db.prepare(`
+        INSERT INTO consumos_internos (loteId, cantidad, motivo, fecha, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        data.loteId,
+        data.cantidad,
+        data.motivo ?? null,
+        now,      // fecha de consumo
+        now,      // createdAt
+        now       // updatedAt
+      );
+
+      // 2) Actualizar lotes: restar 'cantidadActual'
+      db.prepare(`
+        UPDATE lotes
+        SET cantidadActual = cantidadActual - ?
+        WHERE id = ?
+      `).run(data.cantidad, data.loteId);
+
+      // Opcionalmente, si llega a 0 => activo=0
+      const row = db.prepare('SELECT cantidadActual FROM lotes WHERE id=?').get(data.loteId) as { cantidadActual: number } | undefined;
+      if (row && row.cantidadActual <= 0) {
+        db.prepare(`
+          UPDATE lotes
+          SET activo = 0
+          WHERE id = ?
+        `).run(data.loteId);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error descontarPorConsumo:', error);
       return { success: false };
     }
   }

@@ -103,7 +103,6 @@ CREATE TABLE IF NOT EXISTS purchases (
 
 // ==================================
 //   Tabla "detail_compras" (detalle de compras)
-//    -- ACTUALIZADA en una sola sentencia --
 // ==================================
 db.exec(`
 CREATE TABLE IF NOT EXISTS detail_compras (
@@ -121,6 +120,8 @@ CREATE TABLE IF NOT EXISTS detail_compras (
   tipoContenedor TEXT,                  -- 'unidad' | 'caja' | 'paquete'
   unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
   piezasIngresadas REAL DEFAULT 0,      -- total de piezas que realmente ingresan
+
+  precioPorPieza REAL DEFAULT 0,        -- Nueva columna añadida
 
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
@@ -148,50 +149,66 @@ CREATE TABLE IF NOT EXISTS lotes (
   FOREIGN KEY (productoId) REFERENCES products(id)
 );
 `);
-// Agrega estas definiciones al final de tu db.ts, ANTES de export default db;
 
 // ==================================
 //   Tabla "sales" (encabezado de venta)
 // ==================================
 db.exec(`
-  CREATE TABLE IF NOT EXISTS sales (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fecha TEXT NOT NULL,
-    total REAL DEFAULT 0,
-    observaciones TEXT,
-    createdAt TEXT NOT NULL,
-    updatedAt TEXT NOT NULL
-  );
-  `);
-  
-  // ==================================
-  //   Tabla "detail_ventas" (detalle de ventas)
-  // ==================================
-  db.exec(`
-  CREATE TABLE IF NOT EXISTS detail_ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ventaId INTEGER NOT NULL,
-    productoId INTEGER NOT NULL,
-  
-    cantidad REAL NOT NULL DEFAULT 0,
-    precioUnitario REAL NOT NULL DEFAULT 0,
-    subtotal REAL NOT NULL DEFAULT 0,
-  
-    tipoContenedor TEXT,                  -- 'unidad' | 'caja' | 'paquete'
-    unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
-    piezasVendidas REAL DEFAULT 0,        -- total de piezas que se venden
-  
-    lote TEXT,            -- opcional, si quieres enlazar un Lote específico
-    fechaCaducidad TEXT,  -- opcional
-  
-    createdAt TEXT NOT NULL,
-    updatedAt TEXT NOT NULL,
-  
-    FOREIGN KEY (ventaId) REFERENCES sales(id),
-    FOREIGN KEY (productoId) REFERENCES products(id)
-  );
-  `);
-  
+CREATE TABLE IF NOT EXISTS sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,
+  total REAL DEFAULT 0,
+  observaciones TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+`);
+
+// ==================================
+//   Tabla "detail_ventas" (detalle de ventas)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS detail_ventas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ventaId INTEGER NOT NULL,
+  productoId INTEGER NOT NULL,
+
+  cantidad REAL NOT NULL DEFAULT 0,
+  precioUnitario REAL NOT NULL DEFAULT 0,
+  subtotal REAL NOT NULL DEFAULT 0,
+
+  tipoContenedor TEXT,                  -- 'unidad' | 'caja' | 'paquete'
+  unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
+  piezasVendidas REAL DEFAULT 0,        -- total de piezas que se venden
+
+  lote TEXT,            -- opcional, si quieres enlazar un Lote específico
+  fechaCaducidad TEXT,  -- opcional
+
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (ventaId) REFERENCES sales(id),
+  FOREIGN KEY (productoId) REFERENCES products(id)
+);
+`);
+
+// ==================================
+//   Tabla "consumos_internos" (o "merma", "salidas_extra", etc.)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS consumos_internos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  loteId INTEGER NOT NULL,
+  cantidad REAL NOT NULL DEFAULT 0,
+  motivo TEXT,           -- p.ej. "muestras", "consumo interno", "daño", etc.
+  observaciones TEXT,    -- si gustas
+  fecha TEXT NOT NULL,   -- momento en que se efectúa esta salida
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+
+  FOREIGN KEY (loteId) REFERENCES lotes(id)
+);
+`);
 
 // Exportamos la instancia de la DB
 export default db;

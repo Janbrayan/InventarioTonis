@@ -52,11 +52,18 @@ declare global {
       deletePurchase: (id: number) => Promise<{ success: boolean }>;
       getDetallesByCompra: (compraId: number) => Promise<any>;
 
-      // VENTAS (NUEVO)
+      // VENTAS
       getSales: () => Promise<any>;
       createSale: (saleData: any) => Promise<{ success: boolean }>;
       deleteSale: (id: number) => Promise<{ success: boolean }>;
       getDetallesByVenta: (ventaId: number) => Promise<any>;
+
+      // === NUEVO: Función para descontar por consumo interno / merma
+      descontarPorConsumo: (data: {
+        loteId: number;
+        cantidad: number;
+        motivo?: string;
+      }) => Promise<{ success: boolean }>;
     };
   }
 }

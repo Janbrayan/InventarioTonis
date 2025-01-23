@@ -70,7 +70,18 @@ function ConfirmDialog({
   onConfirm
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{
+        style: {
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          backdropFilter: 'blur(5px)',
+        },
+      }}
+    >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
         <Typography>{message}</Typography>
@@ -431,7 +442,18 @@ export default function Ventas() {
       </Card>
 
       {/* Modal Crear Venta */}
-      <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="md">
+      <Dialog
+        open={openModal}
+        onClose={handleCloseModal}
+        fullWidth
+        maxWidth="md"
+        BackdropProps={{
+          style: {
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            backdropFilter: 'blur(5px)',
+          },
+        }}
+      >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Crear Venta</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
@@ -547,7 +569,18 @@ export default function Ventas() {
       </Dialog>
 
       {/* Modal Ver Detalles de Venta */}
-      <Dialog open={openDetalles} onClose={handleCloseDetalles} fullWidth maxWidth="md">
+      <Dialog
+        open={openDetalles}
+        onClose={handleCloseDetalles}
+        fullWidth
+        maxWidth="md"
+        BackdropProps={{
+          style: {
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            backdropFilter: 'blur(5px)',
+          },
+        }}
+      >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           Detalles de la Venta #{viewVentaId}
         </DialogTitle>

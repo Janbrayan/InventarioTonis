@@ -12,6 +12,7 @@ import Categorias from './components/Categorias';
 import Inventario from './components/Inventario';
 import Compras from './components/Compras';
 import Ventas from './components/Ventas';
+import Estadisticas from './components/Estadisticas';
 
 // tus placeholders...
 // GestionProductos, Categorias, etc.
@@ -68,10 +69,9 @@ export default function AppRoutes() {
               <Route path="gestion" element={<GestionProductos/>} />
               <Route path="categorias" element={<Categorias/>} />
               <Route path="inventario" element={<Inventario/>} />
-              <Route path="estadisticas" /* ... */ />
               <Route path='proveedores' element={<Proveedores/>}/>
               <Route path='compras' element={<Compras/>}/>
-
+              <Route path='estadisticas' element={<Estadisticas/>}/>
             </Route>
 
             {/* Ventas */}

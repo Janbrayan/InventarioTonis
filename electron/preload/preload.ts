@@ -152,6 +152,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateLote: (loteData: FrontLote & { id: number }) => ipcRenderer.invoke('update-lote', loteData),
   deleteLote: (id: number) => ipcRenderer.invoke('delete-lote', id),
 
+  // ============= AGREGAMOS LA LLAMADA "descontar-por-consumo" =============
+  descontarPorConsumo: (data: { loteId: number; cantidad: number; motivo?: string }) =>
+    ipcRenderer.invoke('descontar-por-consumo', data),
+
   // === SALES (Ventas) ===
   getSales: () => ipcRenderer.invoke('get-sales'),
   createSale: (saleData: FrontSale) => ipcRenderer.invoke('create-sale', saleData),

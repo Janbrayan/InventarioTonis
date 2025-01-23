@@ -119,12 +119,20 @@ export class PurchaseService {
             (compraId, productoId, cantidad, precioUnitario, subtotal,
              lote, fechaCaducidad,
              tipoContenedor, unidadesPorContenedor, piezasIngresadas,
+             precioPorPieza,             -- AGREGADO
              createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        // AGREGADO: Statement para actualizar el precioCompra en la tabla products
+        const stmtUpdateProduct = db.prepare(`
+          UPDATE products
+          SET precioCompra = ?, updatedAt = ?
+          WHERE id = ?
         `);
 
         for (const det of purchase.detalles) {
-          // Calculamos el subtotal. 
+          // Calculamos el subtotal.
           // - "paquete": cant * unidPorCont * precio
           // - "caja" o "unidad": cant * precio (depende de tu lógica de negocio)
           let sub = det.cantidad * det.precioUnitario;
@@ -132,7 +140,7 @@ export class PurchaseService {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // Si quieres que "caja" se comporte igual a "paquete", 
+          // Si quieres que "caja" se comporte igual a "paquete",
           // descomenta:
           // else if (det.tipoContenedor === 'caja') {
           //   const upc = det.unidadesPorContenedor ?? 1;
@@ -146,6 +154,20 @@ export class PurchaseService {
             piezas = det.cantidad * upc;
           }
 
+          // AGREGADO: Cálculo de precioPorPieza
+          let precioPorPieza = det.precioUnitario;
+          if (det.tipoContenedor === 'caja') {
+            const upc = det.unidadesPorContenedor ?? 1;
+            precioPorPieza = det.precioUnitario / upc;
+          } else if (det.tipoContenedor === 'paquete') {
+            // Dependiendo de tu lógica, si "paquete" significa "precioUnitario" es
+            // precio total del paquete, entonces dividirías igual que con la caja;
+            // si ya es "por pieza", lo dejas tal cual.
+            // Aquí se asume que "precioUnitario" ya es por pieza.
+            precioPorPieza = det.precioUnitario;
+          }
+
+          // 2.1) Insertar el detalle
           stmtDetalle.run(
             compraId,
             det.productoId,
@@ -156,9 +178,17 @@ export class PurchaseService {
             det.fechaCaducidad ?? null,
             det.tipoContenedor ?? null,
             det.unidadesPorContenedor ?? 1,
-            piezas,   // piezasIngresadas
+            piezas,
+            precioPorPieza,  // AGREGADO
             now,
             now
+          );
+
+          // 2.2) Actualizar precioCompra en products
+          stmtUpdateProduct.run(
+            precioPorPieza,  // Nuevo precio de compra
+            now,
+            det.productoId
           );
         }
       }
@@ -214,7 +244,8 @@ export class PurchaseService {
           id, compraId, productoId, cantidad, precioUnitario,
           subtotal, lote, fechaCaducidad,
           tipoContenedor, unidadesPorContenedor, piezasIngresadas,
-          createdAt, updatedAt
+          createdAt, updatedAt,
+          precioPorPieza  -- AGREGADO: si ya existe en tu tabla detail_compras
         FROM detail_compras
         WHERE compraId = ?
       `).all(compraId) as any[]; // Podrías definir un DBDetalleCompra ampliado
@@ -233,6 +264,8 @@ export class PurchaseService {
         piezasIngresadas: r.piezasIngresadas ?? undefined,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
+        // AGREGADO: incluir precioPorPieza (si lo necesitas mostrar)
+        precioPorPieza: r.precioPorPieza ?? undefined,
       }));
     } catch (error) {
       console.error('Error getDetallesByCompraId:', error);

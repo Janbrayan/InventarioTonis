@@ -40,14 +40,15 @@ interface Product {
   nombre: string;
 }
 
+/** Estructura del detalle de compra: */
 interface DetalleCompra {
   productoId: number;
-  cantidad: number;               // # de unidades, cajas o paquetes
-  precioUnitario: number;        
+  cantidad: number;            // # de unidades, cajas o paquetes
+  precioUnitario: number;
   lote?: string;
   fechaCaducidad?: string;
   tipoContenedor?: 'unidad' | 'caja' | 'paquete';
-  unidadesPorContenedor?: number; // cuántas piezas hay en cada caja o paquete
+  unidadesPorContenedor?: number;
 }
 
 interface Purchase {
@@ -57,6 +58,7 @@ interface Purchase {
   total?: number;
   observaciones?: string;
   updatedAt?: string;
+  detalles?: DetalleCompra[];
 }
 
 interface ConfirmDialogProps {
@@ -67,6 +69,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
+/** Diálogo de confirmación genérico */
 function ConfirmDialog({
   open,
   title,
@@ -80,7 +83,11 @@ function ConfirmDialog({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+      BackdropProps={{
+        style: {
+          backdropFilter: 'blur(6px)',
+        },
+      }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
@@ -96,6 +103,7 @@ function ConfirmDialog({
   );
 }
 
+/** Componente principal de Compras */
 export default function Compras() {
   const [compras, setCompras] = useState<Purchase[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -105,27 +113,24 @@ export default function Compras() {
   // Modal para Crear Compra
   const [openModal, setOpenModal] = useState(false);
 
-  // Datos generales de la compra
+  // Encabezado de la compra
   const [proveedorId, setProveedorId] = useState<number>(0);
   const [fecha, setFecha] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [detalles, setDetalles] = useState<DetalleCompra[]>([]);
 
-  // Diálogo de confirmación
+  // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Modal para ver detalles
+  // Modal ver detalles (compra ya existente)
   const [openDetalles, setOpenDetalles] = useState(false);
   const [detallesCompra, setDetallesCompra] = useState<any[]>([]);
   const [viewCompraId, setViewCompraId] = useState<number | null>(null);
 
-  /**
-   * Para los campos del renglón, usamos STRINGS en vez de number,
-   * así el usuario puede borrar/modificar sin que se reinicie a 0.
-   */
+  // Campos para añadir renglón al detalle
   const [selProductoId, setSelProductoId] = useState<number>(0);
   const [cantidadStr, setCantidadStr] = useState('1');
   const [precioUnitStr, setPrecioUnitStr] = useState('');
@@ -159,7 +164,7 @@ export default function Compras() {
 
   function handleOpenCreate() {
     setProveedorId(0);
-    setFecha(new Date().toISOString().substring(0, 10));
+    setFecha(new Date().toISOString().substring(0, 10)); // Fecha por defecto (hoy)
     setObservaciones('');
     setDetalles([]);
     setOpenModal(true);
@@ -170,16 +175,16 @@ export default function Compras() {
   }
 
   /**
-   * Agrega un renglón al array "detalles".
-   * Aquí convertimos los strings a number.
+   * Agrega un renglón (detalle) a la lista "detalles".
+   * Interpreta lo que ingrese el usuario:
+   * - "cantidadStr" => cuántas unidades/cajas/paquetes
+   * - "precioUnitStr" => precio unitario (depende del tipo)
    */
   function addRenglonDetalle() {
     if (!selProductoId) {
       alert('Selecciona un producto.');
       return;
     }
-
-    // Convertir strings a num
     const c = parseFloat(cantidadStr) || 0;
     const p = parseFloat(precioUnitStr) || 0;
     const upc = parseFloat(unidadesPorContenedorStr) || 1;
@@ -198,10 +203,9 @@ export default function Compras() {
       tipoContenedor,
       unidadesPorContenedor: upc,
     };
-
     setDetalles((prev) => [...prev, nuevo]);
 
-    // Reseteamos para que puedas ingresar otro renglón
+    // Reseteamos los campos para otro renglón
     setSelProductoId(0);
     setCantidadStr('1');
     setPrecioUnitStr('');
@@ -218,21 +222,32 @@ export default function Compras() {
   }
 
   /**
-   * Lógica de costos:
-   * - "unidad" o "caja" => subtotal = cantidad * precioUnitario
-   * - "paquete" => subtotal = cantidad * unidadesPorContenedor * precioUnitario
+   * Calcula el total final sumando cada renglón según la lógica:
+   * - unidad: sub = cantidad * precioUnitario
+   * - caja:   sub = #cajas * (precioUnitario es total de la caja)
+   * - paquete: sub = #paquetes * (#piezasPorPaquete) * (precioUnitario es por pieza)
    */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => {
+      let sub = 0;
       if (d.tipoContenedor === 'paquete') {
+        // "precioUnitario" lo interpretamos como PRECIO POR PIEZA
         const upc = d.unidadesPorContenedor ?? 1;
-        return acc + d.cantidad * upc * d.precioUnitario;
+        sub = d.cantidad * upc * d.precioUnitario;
+      } else if (d.tipoContenedor === 'caja') {
+        // "precioUnitario" lo interpretamos como PRECIO DE LA CAJA COMPLETA
+        sub = d.cantidad * d.precioUnitario;
       } else {
-        return acc + d.cantidad * d.precioUnitario;
+        // unidad
+        sub = d.cantidad * d.precioUnitario;
       }
+      return acc + sub;
     }, 0);
   }
 
+  /**
+   * Guardar la compra al backend (createPurchase).
+   */
   async function handleSaveCompra() {
     const total = calcularTotal();
 
@@ -265,7 +280,7 @@ export default function Compras() {
     setOpenModal(false);
   }
 
-  // Para mostrar confirmaciones
+  // ================== Confirm Dialog Helpers ==================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -276,7 +291,7 @@ export default function Compras() {
     setConfirmOpen(false);
   }
 
-  // Ver detalles
+  // ================== Ver DETALLES de una Compra existente ==================
   async function handleVerDetalles(compraId: number) {
     try {
       setViewCompraId(compraId);
@@ -287,14 +302,13 @@ export default function Compras() {
       console.error('Error getDetallesByCompra:', err);
     }
   }
-
   function handleCloseDetalles() {
     setOpenDetalles(false);
     setDetallesCompra([]);
     setViewCompraId(null);
   }
 
-  // Eliminar compra
+  // ================== ELIMINAR COMPRA ==================
   function handleDeleteCompra(compra: Purchase) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -316,7 +330,10 @@ export default function Compras() {
     );
   }
 
-  if (loading) return <p>Cargando compras...</p>;
+  // ================== RENDER ==================
+  if (loading) {
+    return <p>Cargando compras...</p>;
+  }
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -354,12 +371,7 @@ export default function Compras() {
             sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
           >
             <Table>
-              <TableHead
-                sx={{
-                  backgroundColor: '#25303a',
-                  '& th': { color: '#fff' },
-                }}
-              >
+              <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Proveedor</TableCell>
@@ -375,7 +387,6 @@ export default function Compras() {
                   const provName =
                     providers.find((p) => p.id === c.proveedorId)?.nombre ||
                     `ProvID=${c.proveedorId}`;
-
                   return (
                     <TableRow
                       key={c.id}
@@ -432,7 +443,11 @@ export default function Compras() {
         onClose={handleCloseModal}
         fullWidth
         maxWidth="md"
-        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+        BackdropProps={{
+          style: {
+            backdropFilter: 'blur(6px)',
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Crear Compra</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
@@ -490,7 +505,6 @@ export default function Compras() {
               </Select>
             </FormControl>
 
-            {/* Cantidad como string */}
             <TextField
               label="Cantidad"
               type="text"
@@ -499,7 +513,6 @@ export default function Compras() {
               onChange={(e) => setCantidadStr(e.target.value)}
             />
 
-            {/* Precio unitario como string */}
             <TextField
               label="P.Unit"
               type="text"
@@ -508,7 +521,6 @@ export default function Compras() {
               onChange={(e) => setPrecioUnitStr(e.target.value)}
             />
 
-            {/* Tipo de contenedor */}
             <FormControl sx={{ width: 140 }}>
               <InputLabel id="tipoContenedor-label">Tipo</InputLabel>
               <Select
@@ -525,7 +537,6 @@ export default function Compras() {
               </Select>
             </FormControl>
 
-            {/* Solo mostramos "Unid x Cont." si es "caja" o "paquete" */}
             {(tipoContenedor === 'caja' || tipoContenedor === 'paquete') && (
               <TextField
                 label="Unid x Cont."
@@ -556,7 +567,7 @@ export default function Compras() {
             </Button>
           </Box>
 
-          {/* Tabla interna de detalles */}
+          {/* TABLA DE DETALLES - mostrando subtotales y la columna "Precio x Pieza" */}
           <TableContainer component={Paper} sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
@@ -564,10 +575,11 @@ export default function Compras() {
                   <TableCell>Producto</TableCell>
                   <TableCell>Cant</TableCell>
                   <TableCell>P.Unit</TableCell>
+                  <TableCell>Precio x Pieza</TableCell>
                   <TableCell>Subtotal</TableCell>
                   <TableCell>Tipo</TableCell>
                   <TableCell>Unid x Cont.</TableCell>
-                  <TableCell>Piezas</TableCell>
+                  <TableCell>Piezas Totales</TableCell>
                   <TableCell>Lote</TableCell>
                   <TableCell>Caducidad</TableCell>
                   <TableCell>Quitar</TableCell>
@@ -575,45 +587,58 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detalles.map((d, idx) => {
-                  // Buscar nombre del producto
                   const pName =
                     products.find((pp) => pp.id === d.productoId)?.nombre ||
                     `ID=${d.productoId}`;
 
-                  // Subtotal
+                  // 1) Subtotal según la lógica contenedores
                   let sub = 0;
+                  let precioPorPieza = 0;
+                  const upc = d.unidadesPorContenedor ?? 1;
+
                   if (d.tipoContenedor === 'paquete') {
-                    // precio unitario es por cada pieza
-                    const upc = d.unidadesPorContenedor ?? 1;
+                    // precioUnitario es "por pieza"
                     sub = d.cantidad * upc * d.precioUnitario;
-                  } else {
-                    // 'unidad' o 'caja'
+                    precioPorPieza = d.precioUnitario; // ya es por pieza
+                  } else if (d.tipoContenedor === 'caja') {
+                    // precioUnitario es "por caja completa"
                     sub = d.cantidad * d.precioUnitario;
+                    // Si deseas mostrar un precio por pieza:
+                    precioPorPieza = d.precioUnitario / upc;
+                  } else {
+                    // "unidad"
+                    sub = d.cantidad * d.precioUnitario;
+                    // precioPorPieza = precioUnitario
+                    precioPorPieza = d.precioUnitario;
                   }
 
-                  // Piezas ingresadas a inventario
-                  const upc = d.unidadesPorContenedor ?? 1;
-                  const piezas =
-                    d.tipoContenedor === 'unidad' ? d.cantidad : d.cantidad * upc;
+                  // 2) Piezas totales (para visual)
+                  const piezasTotales =
+                    d.tipoContenedor === 'unidad'
+                      ? d.cantidad
+                      : d.cantidad * upc;
 
                   return (
                     <TableRow key={idx}>
                       <TableCell>{pName}</TableCell>
                       <TableCell>{d.cantidad}</TableCell>
                       <TableCell>${d.precioUnitario}</TableCell>
-                      <TableCell>${sub}</TableCell>
-                      <TableCell>{d.tipoContenedor || 'unidad'}</TableCell>
+                      <TableCell>${precioPorPieza.toFixed(2)}</TableCell>
+                      <TableCell>${sub.toFixed(2)}</TableCell>
+                      <TableCell>{d.tipoContenedor}</TableCell>
                       <TableCell>
-                        {d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete'
+                        {(d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete')
                           ? upc
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
-                      <TableCell>{piezas}</TableCell>
+                      <TableCell>{piezasTotales}</TableCell>
                       <TableCell>{d.lote || '—'}</TableCell>
                       <TableCell>
                         {d.fechaCaducidad
                           ? new Date(d.fechaCaducidad).toLocaleDateString()
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
                       <TableCell>
                         <Button
@@ -628,10 +653,9 @@ export default function Compras() {
                     </TableRow>
                   );
                 })}
-
                 {detalles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} align="center">
+                    <TableCell colSpan={11} align="center">
                       Sin renglones aún
                     </TableCell>
                   </TableRow>
@@ -648,13 +672,17 @@ export default function Compras() {
         </DialogActions>
       </Dialog>
 
-      {/* Modal Ver Detalles de Compra */}
+      {/* Modal Ver Detalles de Compra existente */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}
         fullWidth
         maxWidth="md"
-        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+        BackdropProps={{
+          style: {
+            backdropFilter: 'blur(6px)',
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           Detalles de la Compra #{viewCompraId}
@@ -668,6 +696,8 @@ export default function Compras() {
                   <TableCell>Producto</TableCell>
                   <TableCell>Cantidad</TableCell>
                   <TableCell>PrecioUnit</TableCell>
+                  {/* NUEVA COLUMNA PRECIO POR PIEZA */}
+                  <TableCell>Precio x Pieza</TableCell>
                   <TableCell>Subtotal</TableCell>
                   <TableCell>Tipo</TableCell>
                   <TableCell>Unid x Cont.</TableCell>
@@ -684,18 +714,28 @@ export default function Compras() {
                     `ID=${d.productoId}`;
 
                   let sub = 0;
+                  const upc = d.unidadesPorContenedor ?? 1;
+
                   if (d.tipoContenedor === 'paquete') {
-                    const upc = d.unidadesPorContenedor ?? 1;
+                    // "precioUnitario" = precio por pieza
                     sub = d.cantidad * upc * d.precioUnitario;
+                  } else if (d.tipoContenedor === 'caja') {
+                    // "precioUnitario" = precio por caja
+                    sub = d.cantidad * d.precioUnitario;
                   } else {
+                    // "unidad"
                     sub = d.cantidad * d.precioUnitario;
                   }
 
-                  const upc = d.unidadesPorContenedor ?? 1;
                   const piezas =
                     d.tipoContenedor === 'unidad'
                       ? d.cantidad
                       : d.cantidad * upc;
+
+                  // Obtenemos el precio por pieza si te lo proporciona el backend:
+                  const precioPorPieza = d.precioPorPieza
+                    ? d.precioPorPieza.toFixed(2)
+                    : '—';
 
                   return (
                     <TableRow key={d.id}>
@@ -703,31 +743,38 @@ export default function Compras() {
                       <TableCell>{pName}</TableCell>
                       <TableCell>{d.cantidad}</TableCell>
                       <TableCell>${d.precioUnitario}</TableCell>
-                      <TableCell>${sub}</TableCell>
+                      {/* Nueva celda mostrando precioPorPieza */}
+                      <TableCell>
+                        {precioPorPieza !== '—' ? `$${precioPorPieza}` : '—'}
+                      </TableCell>
+                      <TableCell>${sub.toFixed(2)}</TableCell>
                       <TableCell>{d.tipoContenedor || 'unidad'}</TableCell>
                       <TableCell>
-                        {d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete'
+                        {(d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete')
                           ? upc
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
                       <TableCell>{piezas}</TableCell>
                       <TableCell>{d.lote || '—'}</TableCell>
                       <TableCell>
                         {d.fechaCaducidad
                           ? new Date(d.fechaCaducidad).toLocaleDateString()
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
                       <TableCell>
                         {d.updatedAt
                           ? new Date(d.updatedAt).toLocaleString()
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {detallesCompra.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} align="center">
+                    <TableCell colSpan={12} align="center">
                       Sin detalles
                     </TableCell>
                   </TableRow>
@@ -741,7 +788,7 @@ export default function Compras() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirmación */}
+      {/* Diálogo de confirmación */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}

@@ -37,7 +37,6 @@ import {
 interface Product {
   id: number;
   nombre: string;
-  // ... lo que uses adicional (precioVenta, codigoBarras, etc.)
 }
 
 interface Lote {
@@ -92,8 +91,8 @@ function ConfirmDialog({
 }
 
 /**
- * Función para determinar el estado de stock en función del total de piezas.
- * Ajusta los límites (p.ej. < 5 para "poco", < 15 para "normal", etc.) según tus necesidades.
+ * Determina el estado de stock en función del total de piezas.
+ * Ajusta los límites a tu gusto (por ejemplo <5, <15, etc.).
  */
 function getStockStatus(totalPiezas: number) {
   if (totalPiezas < 5) {
@@ -111,25 +110,42 @@ export default function Inventario() {
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal Crear/Editar Lote
+  // =========================
+  //     Modal Crear/Editar Lote
+  // =========================
   const [openModal, setOpenModal] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
 
-  // Campos del form
+  // Campos del form de Lote
   const [productoId, setProductoId] = useState<number>(0);
   const [lote, setLote] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
   const [cantidadActual, setCantidadActual] = useState<number>(0);
 
-  // Diálogo de confirmación
+  // =========================
+  //     Confirm Dialog
+  // =========================
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // ID del producto expandido (solo uno a la vez)
+  // =========================
+  //     Expand/Collapse
+  // =========================
   const [openProductId, setOpenProductId] = useState<number | null>(null);
 
+  // =========================
+  //     Descuento/Merma
+  // =========================
+  const [descuentoOpen, setDescuentoOpen] = useState(false);
+  const [descuentoCantidad, setDescuentoCantidad] = useState('');
+  const [descuentoMotivo, setDescuentoMotivo] = useState('');
+  const [descuentoLote, setDescuentoLote] = useState<Lote | null>(null);
+
+  // =========================
+  //     useEffect / Data
+  // =========================
   useEffect(() => {
     fetchData();
   }, []);
@@ -150,15 +166,18 @@ export default function Inventario() {
     }
   }
 
-  // Agrupamos lotes por producto y calculamos totales
+  // =========================
+  //   Agrupación de lotes por producto
+  // =========================
   const grouped = products.map((prod) => {
-    const lotesDeEsteProd = lotes.filter((l) => l.productoId === prod.id);
+    const lotesDeEsteProd = lotes.filter(
+      (l) => l.productoId === prod.id && l.activo !== false
+    );
     const totalLotes = lotesDeEsteProd.length;
     const totalPiezas = lotesDeEsteProd.reduce(
       (acc, lote) => acc + (lote.cantidadActual ?? 0),
       0
     );
-
     return {
       product: prod,
       lotes: lotesDeEsteProd,
@@ -167,12 +186,13 @@ export default function Inventario() {
     };
   });
 
-  // Toggle expand/collapse (solo uno abierto a la vez)
   function toggleProductRow(prodId: number) {
     setOpenProductId((prev) => (prev === prodId ? null : prodId));
   }
 
-  // Abrir modal para Crear Lote
+  // =========================
+  //     Crear / Editar
+  // =========================
   function handleOpenCreate() {
     setEditingLote(null);
     setProductoId(0);
@@ -181,8 +201,6 @@ export default function Inventario() {
     setCantidadActual(0);
     setOpenModal(true);
   }
-
-  // Abrir modal para Editar Lote
   function handleOpenEdit(l: Lote) {
     setEditingLote(l);
     setProductoId(l.productoId);
@@ -191,13 +209,140 @@ export default function Inventario() {
     setCantidadActual(l.cantidadActual ?? 0);
     setOpenModal(true);
   }
-
   function handleCloseModal() {
     setOpenModal(false);
     setEditingLote(null);
   }
 
-  // Confirm dialog
+  async function handleSaveLote() {
+    setOpenModal(false);
+    const isEdit = !!editingLote;
+    const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
+
+    openConfirmDialog(
+      `Confirmar ${actionText}`,
+      `¿Deseas ${actionText} este lote?`,
+      async () => {
+        try {
+          if (!window.electronAPI) return;
+
+          if (!isEdit) {
+            // Crear
+            const resp = await window.electronAPI.createLote({
+              productoId,
+              lote,
+              fechaCaducidad: fechaCaducidad || null,
+              cantidadActual,
+              activo: true,
+            });
+            if (!resp?.success) {
+              alert('No se pudo crear el lote.');
+            }
+          } else {
+            // Editar
+            const resp = await window.electronAPI.updateLote({
+              id: editingLote?.id,
+              productoId,
+              lote,
+              fechaCaducidad: fechaCaducidad || null,
+              cantidadActual,
+              activo: true,
+            });
+            if (!resp?.success) {
+              alert('No se pudo actualizar el lote.');
+            }
+          }
+          await fetchData();
+        } catch (err) {
+          console.error('Error guardando lote:', err);
+        } finally {
+          closeConfirmDialog();
+        }
+      }
+    );
+  }
+
+  // =========================
+  //     Eliminar (Soft-Delete)
+  // =========================
+  function handleDeleteLote(l: Lote) {
+    openConfirmDialog(
+      'Confirmar eliminación',
+      `¿Deseas ELIMINAR (desactivar) el lote "${l.lote}" del producto ID=${l.productoId}?`,
+      async () => {
+        try {
+          if (!window.electronAPI) return;
+          const resp = await window.electronAPI.updateLote({
+            id: l.id,
+            productoId: l.productoId,
+            lote: l.lote,
+            fechaCaducidad: l.fechaCaducidad || null,
+            cantidadActual: l.cantidadActual || 0,
+            activo: false,
+          });
+          if (!resp?.success) {
+            alert('No se pudo desactivar el lote.');
+          }
+          await fetchData();
+        } catch (err) {
+          console.error('Error soft-deleting lote:', err);
+        } finally {
+          closeConfirmDialog();
+        }
+      }
+    );
+  }
+
+  // =========================
+  //     Descuento / Merma
+  // =========================
+  function handleOpenDescuento(l: Lote) {
+    setDescuentoLote(l);
+    setDescuentoCantidad('');
+    setDescuentoMotivo('');
+    setDescuentoOpen(true);
+  }
+  function handleCloseDescuento() {
+    setDescuentoOpen(false);
+    setDescuentoLote(null);
+    setDescuentoCantidad('');
+    setDescuentoMotivo('');
+  }
+  async function handleConfirmDescuento() {
+    if (!descuentoLote) return;
+    const cant = parseFloat(descuentoCantidad) || 0;
+    if (cant <= 0) {
+      alert('La cantidad a descontar debe ser mayor a 0.');
+      return;
+    }
+    openConfirmDialog(
+      'Confirmar Consumo/Merma',
+      `¿Deseas descontar ${cant} unidades del Lote "${descuentoLote.lote}"?`,
+      async () => {
+        try {
+          if (!window.electronAPI) return;
+          const resp = await window.electronAPI.descontarPorConsumo({
+            loteId: descuentoLote.id!,
+            cantidad: cant,
+            motivo: descuentoMotivo,
+          });
+          if (!resp?.success) {
+            alert('No se pudo descontar.');
+          }
+          await fetchData();
+        } catch (err) {
+          console.error('Error en descontarPorConsumo:', err);
+        } finally {
+          closeConfirmDialog();
+          handleCloseDescuento();
+        }
+      }
+    );
+  }
+
+  // =========================
+  //     Confirm Dialog Helpers
+  // =========================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -208,84 +353,31 @@ export default function Inventario() {
     setConfirmOpen(false);
   }
 
-  // Guardar Lote (crear o editar)
-  async function handleSaveLote() {
-    setOpenModal(false);
-    const isEdit = !!editingLote;
-    const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
-
-    openConfirmDialog(`Confirmar ${actionText}`, `¿Deseas ${actionText} este lote?`, async () => {
-      try {
-        if (!window.electronAPI) return;
-
-        if (!isEdit) {
-          // Crear
-          const resp = await window.electronAPI.createLote({
-            productoId,
-            lote,
-            fechaCaducidad: fechaCaducidad || null,
-            cantidadActual,
-            activo: true,
-          });
-          if (!resp?.success) {
-            alert('No se pudo crear el lote.');
-          }
-        } else {
-          // Editar
-          const resp = await window.electronAPI.updateLote({
-            id: editingLote.id,
-            productoId,
-            lote,
-            fechaCaducidad: fechaCaducidad || null,
-            cantidadActual,
-            activo: true,
-          });
-          if (!resp?.success) {
-            alert('No se pudo actualizar el lote.');
-          }
-        }
-        await fetchData();
-      } catch (err) {
-        console.error('Error guardando lote:', err);
-      } finally {
-        closeConfirmDialog();
-      }
-    });
-  }
-
-  // Eliminar Lote
-  function handleDeleteLote(l: Lote) {
-    openConfirmDialog(
-      'Confirmar eliminación',
-      `¿Deseas ELIMINAR el lote "${l.lote}" del producto ID=${l.productoId}?`,
-      async () => {
-        try {
-          if (!window.electronAPI) return;
-          const resp = await window.electronAPI.deleteLote(l.id!);
-          if (!resp?.success) {
-            alert('No se pudo eliminar el lote.');
-          }
-          await fetchData();
-        } catch (err) {
-          console.error('Error eliminando lote:', err);
-        } finally {
-          closeConfirmDialog();
-        }
-      }
-    );
-  }
-
+  // =========================
+  //     RENDER
+  // =========================
   if (loading) {
     return <p>Cargando inventario (Productos)...</p>;
   }
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: 'bold', color: '#212529' }}
+      >
         Inventario (Productos)
       </Typography>
 
-      <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      <Card
+        sx={{
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff',
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -312,7 +404,10 @@ export default function Inventario() {
         <CardContent sx={{ p: 0 }}>
           <TableContainer
             component={Paper}
-            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+            sx={{
+              borderRadius: '0 0 8px 8px',
+              backgroundColor: '#2b3640',
+            }}
           >
             <Table>
               <TableHead
@@ -331,11 +426,8 @@ export default function Inventario() {
               <TableBody>
                 {grouped.map(({ product, lotes: lotesDeEsteProd, totalLotes, totalPiezas }) => {
                   const isOpen = openProductId === product.id;
-
-                  // Info sobre lotes y piezas
                   const infoExtra = `(${totalLotes} lotes, ${totalPiezas} piezas)`;
 
-                  // Obtenemos estado de stock
                   const { label: stockLabel, color: stockColor } = getStockStatus(totalPiezas);
 
                   return (
@@ -355,19 +447,31 @@ export default function Inventario() {
                         </TableCell>
                         <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
                           {product.nombre}{' '}
-                          <Typography component="span" sx={{ color: '#fff', fontSize: '0.85rem', ml: 1 }}>
+                          <Typography
+                            component="span"
+                            sx={{
+                              color: '#fff',
+                              fontSize: '0.85rem',
+                              ml: 1,
+                            }}
+                          >
                             {infoExtra}
                           </Typography>
                           {/* Estado de stock */}
                           <Typography
                             component="span"
-                            sx={{ color: stockColor, fontSize: '0.85rem', ml: 2, fontWeight: 'bold' }}
+                            sx={{
+                              color: stockColor,
+                              fontSize: '0.85rem',
+                              ml: 2,
+                              fontWeight: 'bold',
+                            }}
                           >
                             {stockLabel}
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ color: '#fff' }}>
-                          {/* Botón u opciones adicionales, si quieres */}
+                          {/* Podrías poner aquí algún botón extra si quieres */}
                         </TableCell>
                       </TableRow>
 
@@ -378,7 +482,11 @@ export default function Inventario() {
                             <Box sx={{ margin: 2 }}>
                               <Typography
                                 variant="subtitle1"
-                                sx={{ color: '#fff', fontWeight: 'bold', mb: 1 }}
+                                sx={{
+                                  color: '#fff',
+                                  fontWeight: 'bold',
+                                  mb: 1,
+                                }}
                               >
                                 Lotes de {product.nombre}
                               </Typography>
@@ -396,7 +504,11 @@ export default function Inventario() {
                                 <TableBody>
                                   {lotesDeEsteProd.length === 0 ? (
                                     <TableRow>
-                                      <TableCell colSpan={6} sx={{ color: '#fff' }} align="center">
+                                      <TableCell
+                                        colSpan={6}
+                                        sx={{ color: '#fff' }}
+                                        align="center"
+                                      >
                                         Sin lotes para {product.nombre}
                                       </TableCell>
                                     </TableRow>
@@ -406,12 +518,17 @@ export default function Inventario() {
                                         key={l.id}
                                         sx={{
                                           '&:hover': {
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
+                                            backgroundColor:
+                                              'rgba(255,255,255,0.05)',
                                           },
                                         }}
                                       >
-                                        <TableCell sx={{ color: '#fff' }}>{l.id}</TableCell>
-                                        <TableCell sx={{ color: '#fff' }}>{l.lote || '—'}</TableCell>
+                                        <TableCell sx={{ color: '#fff' }}>
+                                          {l.id}
+                                        </TableCell>
+                                        <TableCell sx={{ color: '#fff' }}>
+                                          {l.lote || '—'}
+                                        </TableCell>
                                         <TableCell sx={{ color: '#fff' }}>
                                           {l.fechaCaducidad
                                             ? new Date(l.fechaCaducidad).toLocaleDateString()
@@ -433,7 +550,7 @@ export default function Inventario() {
                                             sx={{ mr: 1, fontWeight: 'bold' }}
                                             startIcon={<EditIcon />}
                                             onClick={(e) => {
-                                              e.stopPropagation(); // evita colapsar la fila
+                                              e.stopPropagation(); 
                                               handleOpenEdit(l);
                                             }}
                                           >
@@ -443,7 +560,7 @@ export default function Inventario() {
                                             variant="contained"
                                             color="error"
                                             size="small"
-                                            sx={{ fontWeight: 'bold' }}
+                                            sx={{ fontWeight: 'bold', mr: 1 }}
                                             startIcon={<DeleteIcon />}
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -451,6 +568,19 @@ export default function Inventario() {
                                             }}
                                           >
                                             Eliminar
+                                          </Button>
+                                          {/* NUEVO: Botón para Merma/Descuento */}
+                                          <Button
+                                            variant="outlined"
+                                            color="info"
+                                            size="small"
+                                            sx={{ fontWeight: 'bold' }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOpenDescuento(l);
+                                            }}
+                                          >
+                                            Descontar
                                           </Button>
                                         </TableCell>
                                       </TableRow>
@@ -466,6 +596,7 @@ export default function Inventario() {
                   );
                 })}
 
+                {/* Si no hay productos en absoluto */}
                 {grouped.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={3} align="center" sx={{ color: '#fff' }}>
@@ -492,7 +623,9 @@ export default function Inventario() {
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           {editingLote ? 'Editar Lote' : 'Crear Lote'}
         </DialogTitle>
-        <DialogContent sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <DialogContent
+          sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <FormControl fullWidth>
             <InputLabel id="prod-select-label">Producto</InputLabel>
             <Select
@@ -553,7 +686,7 @@ export default function Inventario() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de confirmación */}
+      {/* Diálogo de confirmación genérico */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
@@ -561,6 +694,39 @@ export default function Inventario() {
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
       />
+
+      {/* Diálogo de Descuento / Merma */}
+      <Dialog
+        open={descuentoOpen}
+        onClose={handleCloseDescuento}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Descontar / Merma</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          <Typography variant="body2">
+            Ingresa la cantidad a descontar (por consumo interno, merma, etc.)
+            y un motivo opcional.
+          </Typography>
+          <TextField
+            label="Cantidad a descontar"
+            type="number"
+            value={descuentoCantidad}
+            onChange={(e) => setDescuentoCantidad(e.target.value)}
+          />
+          <TextField
+            label="Motivo (opcional)"
+            value={descuentoMotivo}
+            onChange={(e) => setDescuentoMotivo(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDescuento}>Cancelar</Button>
+          <Button variant="contained" onClick={handleConfirmDescuento}>
+            Descontar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

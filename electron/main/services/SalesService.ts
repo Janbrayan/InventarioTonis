@@ -28,14 +28,20 @@ export interface DetalleVenta {
   piezasVendidas?: number;    // total de piezas que realmente se venden
 }
 
-/** Interfaz para la fila del Lote 
- * (solo las propiedades que uses en el descuento) */
+/**
+ * Interfaz para la fila del Lote (solo las propiedades que uses).
+ * Para FEFO, necesitamos al menos `fechaCaducidad` y `cantidadActual`.
+ */
 interface DBLoteRow {
   id: number;
-  cantidadActual: number; 
-  // si gustas, agrega activo, lote, fechaCaducidad, etc.
+  cantidadActual: number;
+  fechaCaducidad: string | null;
+  // ... si gustas, agrega más campos como "activo", "lote", etc.
 }
 
+/**
+ * Servicio de Ventas, con lógica FEFO (descontar lote con caducidad más próxima).
+ */
 export class SalesService {
 
   /** Listar Ventas (encabezado) */
@@ -62,12 +68,12 @@ export class SalesService {
     }
   }
 
-  /** Crear Venta (encabezado + detalles) + descontar lotes */
+  /** Crear Venta (encabezado + detalles) + descontar lotes (FEFO) */
   static async createSale(sale: Sale): Promise<{ success: boolean }> {
     const now = new Date().toISOString();
 
     const tx = db.transaction(() => {
-      // 1) Insertar encabezado en "sales"
+      // 1) Insertar encabezado en 'sales'
       const result = db.prepare(`
         INSERT INTO sales (fecha, total, observaciones, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?)
@@ -80,7 +86,7 @@ export class SalesService {
       );
       const ventaId = result.lastInsertRowid as number;
 
-      // 2) Insertar detalles en "detail_ventas"
+      // 2) Insertar detalles en 'detail_ventas'
       if (sale.detalles && sale.detalles.length > 0) {
         const stmtDetalle = db.prepare(`
           INSERT INTO detail_ventas
@@ -92,14 +98,13 @@ export class SalesService {
         `);
 
         for (const det of sale.detalles) {
-          // Calculamos subtotal
+          // Subtotal según la lógica de contenedores
           let sub = det.cantidad * det.precioUnitario;
           if (det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // Si "caja" también multiplica por upc, agrégalo:
-          // else if (det.tipoContenedor === 'caja') { ... }
+          // (Si "caja" también multiplica, añádelo)
 
           // piezasVendidas
           let piezas = det.cantidad;
@@ -125,29 +130,35 @@ export class SalesService {
         }
       }
 
-      // 3) Descontar inventario en "lotes"
+      // 3) Descontar inventario en 'lotes' según FEFO (fecha más próxima).
       if (sale.detalles && sale.detalles.length > 0) {
         for (const det of sale.detalles) {
+          // Calculamos cuántas piezas se deben descontar
           let piezas = det.cantidad;
           if (det.tipoContenedor === 'caja' || det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             piezas = det.cantidad * upc;
           }
 
-          // Ejemplo simple: descuenta del PRIMER LOTE con stock (orden ASC)
           let toDiscount = piezas;
-          while (toDiscount > 0) {
 
+          // FEFO: ordenamos por fechaCaducidad ASC, y luego id
+          while (toDiscount > 0) {
             const loteRow = db.prepare(`
-              SELECT *
+              SELECT
+                id,
+                cantidadActual,
+                fechaCaducidad
               FROM lotes
               WHERE productoId = ?
                 AND activo = 1
                 AND cantidadActual > 0
-              ORDER BY id ASC
+              ORDER BY
+                CASE WHEN fechaCaducidad IS NULL THEN 999999999 END, -- si no hay fecha, va al final
+                fechaCaducidad ASC,
+                id ASC
               LIMIT 1
             `).get(det.productoId) as DBLoteRow | undefined;
-            // ^ AQUI indicamos que el resultado coincide con DBLoteRow
 
             if (!loteRow) {
               // No hay más lotes con stock
