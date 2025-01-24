@@ -194,6 +194,15 @@ export default function Compras() {
       return;
     }
 
+    // =========================
+    // VALIDACIÓN: no permitir agregar más de una vez el mismo producto
+    // =========================
+    const alreadyExists = detalles.some((d) => d.productoId === selProductoId);
+    if (alreadyExists) {
+      alert('Este producto ya fue agregado. Solo puede agregarse una vez.');
+      return;
+    }
+
     const nuevo: DetalleCompra = {
       productoId: selProductoId,
       cantidad: c,
@@ -663,7 +672,13 @@ export default function Compras() {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* NUEVO: Mostrar total de la compra en tiempo real */}
+          <Typography variant="h6" sx={{ mt: 2, textAlign: 'right', pr: 2 }}>
+            Total de la compra: ${calcularTotal().toFixed(2)}
+          </Typography>
         </DialogContent>
+
         <DialogActions>
           <Button onClick={handleCloseModal}>Cancelar</Button>
           <Button variant="contained" onClick={handleSaveCompra}>

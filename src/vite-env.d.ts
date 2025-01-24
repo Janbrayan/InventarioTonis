@@ -58,12 +58,96 @@ declare global {
       deleteSale: (id: number) => Promise<{ success: boolean }>;
       getDetallesByVenta: (ventaId: number) => Promise<any>;
 
-      // === NUEVO: Función para descontar por consumo interno / merma
+      // === Función para descontar por consumo interno / merma
       descontarPorConsumo: (data: {
         loteId: number;
         cantidad: number;
         motivo?: string;
       }) => Promise<{ success: boolean }>;
-    };
+
+      // ========== STATS (Actualizado) ==========
+      statsGetTotalComprasPorFecha: (params: {
+        fechaInicio?: string;
+        fechaFin?: string;
+      }) => Promise<{ totalCompras: number }>;
+
+      statsGetComprasPorProveedor: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<
+        Array<{
+          proveedorId: number;
+          nombreProveedor: string;
+          totalCompras: number;
+        }>
+      >;
+
+      // NUEVO 1) Cantidad total de productos activos
+      statsGetTotalProductosActivos: () => Promise<{
+        totalProductos: number;
+      }>;
+
+      // NUEVO 2) Inversión de compra por producto
+      statsGetInversionCompraPorProducto: () => Promise<
+        Array<{
+          productoId: number;
+          nombreProducto: string;
+          inversionTotal: number;
+        }>
+      >;
+
+      // NUEVO 3) Valor total de inventario
+      statsGetValorTotalInventario: () => Promise<{
+        valorInventario: number;
+      }>;
+
+      statsGetStockActualPorProducto: () => Promise<
+        Array<{
+          productoId: number;
+          nombreProducto: string;
+          stockTotal: number;
+        }>
+      >;
+
+      statsGetProductosProximosACaducar: (dias: number) => Promise<
+        Array<{
+          productoId: number;
+          nombreProducto: string;
+          loteId: number;
+          fechaCaducidad: string;
+        }>
+      >;
+
+      statsGetConsumosPorMotivo: () => Promise<
+        Array<{
+          motivo: string;
+          totalConsumos: number;
+          cantidadTotal: number;
+        }>
+      >;
+
+      statsGetCantidadTotalConsumos: (params: {
+        fechaInicio?: string;
+        fechaFin?: string;
+      }) => Promise<{ totalConsumos: number }>;
+
+      statsGetDistribucionProductosPorCategoria: () => Promise<
+        Array<{
+          categoriaId: number;
+          nombreCategoria: string;
+          totalProductos: number;
+        }>
+      >;
+
+      statsGetNumCategoriasActivasInactivas: () => Promise<{
+        categoriasActivas: number;
+        categoriasInactivas: number;
+      }>;
+
+      // NUEVO 4) Total de piezas en el inventario
+      statsGetTotalPiezasInventario: () => Promise<{
+        totalPiezas: number;
+      }>;
+    }
   }
 }

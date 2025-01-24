@@ -3,82 +3,29 @@ import db from '../db';
 
 export class StatsService {
   /**
-   * Retorna el total de ventas en un periodo, o la venta total de un producto, etc.
-   * Este es un ejemplo genérico de "estadística" de Ventas.
-   */
-  static async getTotalVentasPorFecha(
-    fechaInicio?: string,
-    fechaFin?: string
-  ): Promise<{ totalVentas: number }> {
-    try {
-      // Ejemplo: SELECT SUM(total) de la tabla `sales`
-      // filtra por fecha (si proporcionas fechaInicio y fechaFin)
-      let sql = `SELECT SUM(total) as total FROM sales`;
-      const params: any[] = [];
-
-      if (fechaInicio && fechaFin) {
-        sql += ` WHERE date(fecha) BETWEEN date(?) AND date(?)`;
-        params.push(fechaInicio, fechaFin);
-      } else if (fechaInicio) {
-        sql += ` WHERE date(fecha) >= date(?)`;
-        params.push(fechaInicio);
-      } else if (fechaFin) {
-        sql += ` WHERE date(fecha) <= date(?)`;
-        params.push(fechaFin);
-      }
-
-      const row = db.prepare(sql).get(...params) as { total: number } | undefined;
-      return { totalVentas: row?.total ?? 0 };
-    } catch (error) {
-      console.error('Error getTotalVentasPorFecha:', error);
-      return { totalVentas: 0 };
-    }
-  }
-
-  /**
-   * Ejemplo: Retorna cuántas unidades de X producto se han vendido en total.
-   */
-  static async getUnidadesVendidasProducto(productoId: number): Promise<{ totalVendidas: number }> {
-    try {
-      // Podrías consultar la tabla detail_ventas sumando "piezasVendidas"
-      const row = db
-        .prepare(
-          `
-            SELECT SUM(piezasVendidas) as total
-            FROM detail_ventas
-            WHERE productoId = ?
-          `
-        )
-        .get(productoId) as { total: number } | undefined;
-
-      return { totalVendidas: row?.total ?? 0 };
-    } catch (error) {
-      console.error('Error getUnidadesVendidasProducto:', error);
-      return { totalVendidas: 0 };
-    }
-  }
-
-  /**
-   * Ejemplo: Retorna el costo total invertido (compras) en un rango de fechas.
+   * 1) Total de COMPRAS en un periodo (suma de la columna "total" en purchases).
+   *    - Filtra usando substr(fecha,1,10) entre fechaInicio y fechaFin.
    */
   static async getTotalComprasPorFecha(
     fechaInicio?: string,
     fechaFin?: string
   ): Promise<{ totalCompras: number }> {
     try {
-      // Tabla `purchases`, sumamos la columna "total"
       let sql = `SELECT SUM(total) as total FROM purchases`;
       const params: any[] = [];
 
-      if (fechaInicio && fechaFin) {
-        sql += ` WHERE date(fecha) BETWEEN date(?) AND date(?)`;
-        params.push(fechaInicio, fechaFin);
-      } else if (fechaInicio) {
-        sql += ` WHERE date(fecha) >= date(?)`;
-        params.push(fechaInicio);
-      } else if (fechaFin) {
-        sql += ` WHERE date(fecha) <= date(?)`;
-        params.push(fechaFin);
+      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
+      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+
+      if (startDate && endDate) {
+        sql += ` WHERE substr(fecha,1,10) BETWEEN ? AND ?`;
+        params.push(startDate, endDate);
+      } else if (startDate) {
+        sql += ` WHERE substr(fecha,1,10) >= ?`;
+        params.push(startDate);
+      } else if (endDate) {
+        sql += ` WHERE substr(fecha,1,10) <= ?`;
+        params.push(endDate);
       }
 
       const row = db.prepare(sql).get(...params) as { total: number } | undefined;
@@ -90,66 +37,334 @@ export class StatsService {
   }
 
   /**
-   * Ejemplo: Los n productos más vendidos (por unidades).
-   * - Se basa en detail_ventas => SUM(piezasVendidas) group by productoId
+   * 2) Compras por PROVEEDOR:
    */
-  static async getTopProductosVendidos(limit = 5) {
+  static async getComprasPorProveedor(
+    fechaInicio?: string,
+    fechaFin?: string
+  ): Promise<Array<{ proveedorId: number; nombreProveedor: string; totalCompras: number }>> {
     try {
-      // Un ejemplo de query que agrupa las ventas
-      const rows = db
-        .prepare(
-          `
-          SELECT 
-            dv.productoId as productoId,
-            p.nombre as nombreProducto,
-            SUM(dv.piezasVendidas) as totalVendidas
-          FROM detail_ventas dv
-          JOIN products p ON p.id = dv.productoId
-          GROUP BY dv.productoId
-          ORDER BY totalVendidas DESC
-          LIMIT ?
-        `
-        )
-        .all(limit);
+      let sql = `
+        SELECT 
+          p.id as proveedorId,
+          p.nombre as nombreProveedor,
+          IFNULL(SUM(pc.total), 0) as totalCompras
+        FROM providers p
+        LEFT JOIN purchases pc ON pc.proveedorId = p.id
+      `;
+      const conditions: string[] = [];
+      const params: any[] = [];
 
-      // Retornamos el array con { productoId, nombreProducto, totalVendidas }
-      return rows || [];
+      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
+      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+
+      if (startDate && endDate) {
+        conditions.push(`substr(pc.fecha,1,10) BETWEEN ? AND ?`);
+        params.push(startDate, endDate);
+      } else if (startDate) {
+        conditions.push(`substr(pc.fecha,1,10) >= ?`);
+        params.push(startDate);
+      } else if (endDate) {
+        conditions.push(`substr(pc.fecha,1,10) <= ?`);
+        params.push(endDate);
+      }
+
+      if (conditions.length > 0) {
+        sql += ` WHERE ` + conditions.join(' AND ');
+      }
+
+      sql += ` GROUP BY p.id ORDER BY totalCompras DESC`;
+
+      const rows = db.prepare(sql).all(...params) as Array<{
+        proveedorId: number;
+        nombreProveedor: string;
+        totalCompras: number;
+      }>;
+
+      return rows;
     } catch (error) {
-      console.error('Error getTopProductosVendidos:', error);
+      console.error('Error getComprasPorProveedor:', error);
       return [];
     }
   }
 
   /**
-   * Otro ejemplo: Ganancia bruta = Ventas - Costo
-   * Podrías estimar el costo si guardaste precioCompra en cada venta/detalle
-   * o si asumes "precioCompra" actual. 
-   * Este ejemplo es un placeholder (debes ajustarlo).
+   * 3) Cantidad TOTAL de productos activos.
    */
-  static async getGananciaAproximada(): Promise<{ ganancia: number }> {
+  static async getTotalProductosActivos(): Promise<{ totalProductos: number }> {
     try {
-      // Escenario 1: Tienes un campo "costoUnitario" en detail_ventas
-      // y "precioUnitario" => la ganancia es SUM(precioUnitario - costoUnitario)*cant
-      // ...
-      // Escenario 2: Tomas el total de la tabla sales y le restas total de purchases (sencillo).
-      //  -> Ganancia = sum(ventas) - sum(compras)
-      //  -> Ojo: no siempre exacto por el inventario en curso, etc.
+      const row = db
+        .prepare(`SELECT COUNT(*) as count FROM products WHERE activo = 1`)
+        .get() as { count: number } | undefined;
 
-      const ventasRow = db
-        .prepare(`SELECT SUM(total) as sumVentas FROM sales`)
-        .get() as { sumVentas: number } | undefined;
-      const comprasRow = db
-        .prepare(`SELECT SUM(total) as sumCompras FROM purchases`)
-        .get() as { sumCompras: number } | undefined;
-
-      const sumVentas = ventasRow?.sumVentas ?? 0;
-      const sumCompras = comprasRow?.sumCompras ?? 0;
-      const ganancia = sumVentas - sumCompras;
-
-      return { ganancia };
+      return { totalProductos: row?.count ?? 0 };
     } catch (error) {
-      console.error('Error getGananciaAproximada:', error);
-      return { ganancia: 0 };
+      console.error('Error getTotalProductosActivos:', error);
+      return { totalProductos: 0 };
+    }
+  }
+
+  /**
+   * 4) Inversión de compra POR producto:
+   *    - Suma (cantidad * precioUnitario) en detail_compras.
+   */
+  static async getInversionCompraPorProducto(): Promise<
+    Array<{
+      productoId: number;
+      nombreProducto: string;
+      inversionTotal: number;
+    }>
+  > {
+    try {
+      const sql = `
+        SELECT
+          p.id as productoId,
+          p.nombre as nombreProducto,
+          IFNULL(SUM(dc.cantidad * dc.precioUnitario), 0) as inversionTotal
+        FROM products p
+        LEFT JOIN detail_compras dc ON dc.productoId = p.id
+        LEFT JOIN purchases pr ON pr.id = dc.compraId
+        GROUP BY p.id
+        ORDER BY inversionTotal DESC
+      `;
+      const rows = db.prepare(sql).all() as Array<{
+        productoId: number;
+        nombreProducto: string;
+        inversionTotal: number;
+      }>;
+
+      return rows;
+    } catch (error) {
+      console.error('Error getInversionCompraPorProducto:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 5) Valor TOTAL del inventario (precioCompra * cantidadActual).
+   */
+  static async getValorTotalInventario(): Promise<{ valorInventario: number }> {
+    try {
+      const sql = `
+        SELECT 
+          SUM(p.precioCompra * l.cantidadActual) as valor
+        FROM lotes l
+        JOIN products p ON p.id = l.productoId
+        WHERE l.activo = 1
+      `;
+      const row = db.prepare(sql).get() as { valor: number } | undefined;
+
+      return { valorInventario: row?.valor ?? 0 };
+    } catch (error) {
+      console.error('Error getValorTotalInventario:', error);
+      return { valorInventario: 0 };
+    }
+  }
+
+  /**
+   * 6) STOCK ACTUAL por producto (suma de cantidadActual).
+   */
+  static async getStockActualPorProducto(): Promise<
+    Array<{ productoId: number; nombreProducto: string; stockTotal: number }>
+  > {
+    try {
+      const sql = `
+        SELECT 
+          l.productoId as productoId,
+          p.nombre as nombreProducto,
+          SUM(l.cantidadActual) as stockTotal
+        FROM lotes l
+        JOIN products p ON p.id = l.productoId
+        WHERE l.activo = 1
+        GROUP BY l.productoId
+        ORDER BY stockTotal DESC
+      `;
+      const rows = db.prepare(sql).all() as Array<{
+        productoId: number;
+        nombreProducto: string;
+        stockTotal: number;
+      }>;
+
+      return rows;
+    } catch (error) {
+      console.error('Error getStockActualPorProducto:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 7) Productos próximos a CADUCAR
+   */
+  static async getProductosProximosACaducar(
+    dias = 30
+  ): Promise<Array<{ productoId: number; nombreProducto: string; loteId: number; fechaCaducidad: string }>> {
+    try {
+      const sql = `
+        SELECT
+          l.id as loteId,
+          l.productoId,
+          p.nombre as nombreProducto,
+          l.fechaCaducidad
+        FROM lotes l
+        JOIN products p ON p.id = l.productoId
+        WHERE 
+          l.activo = 1
+          AND l.fechaCaducidad IS NOT NULL
+          AND date(l.fechaCaducidad) <= date('now', ?)
+        ORDER BY l.fechaCaducidad ASC
+      `;
+      const rows = db.prepare(sql).all(`+${dias} days`) as Array<{
+        loteId: number;
+        productoId: number;
+        nombreProducto: string;
+        fechaCaducidad: string;
+      }>;
+
+      return rows.map((r) => ({
+        productoId: r.productoId,
+        nombreProducto: r.nombreProducto,
+        loteId: r.loteId,
+        fechaCaducidad: r.fechaCaducidad,
+      }));
+    } catch (error) {
+      console.error('Error getProductosProximosACaducar:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 8) Mermas/consumos internos agrupados por MOTIVO
+   */
+  static async getConsumosPorMotivo(): Promise<
+    Array<{ motivo: string; totalConsumos: number; cantidadTotal: number }>
+  > {
+    try {
+      const sql = `
+        SELECT
+          IFNULL(ci.motivo, 'SIN_MOTIVO') as motivo,
+          COUNT(ci.id) as totalConsumos,
+          SUM(ci.cantidad) as cantidadTotal
+        FROM consumos_internos ci
+        GROUP BY ci.motivo
+        ORDER BY cantidadTotal DESC
+      `;
+      const rows = db.prepare(sql).all() as Array<{
+        motivo: string;
+        totalConsumos: number;
+        cantidadTotal: number;
+      }>;
+
+      return rows;
+    } catch (error) {
+      console.error('Error getConsumosPorMotivo:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 9) Cantidad total de consumos/mermas en un rango de fechas
+   */
+  static async getCantidadTotalConsumos(
+    fechaInicio?: string,
+    fechaFin?: string
+  ): Promise<{ totalConsumos: number }> {
+    try {
+      let sql = `SELECT SUM(cantidad) as total FROM consumos_internos`;
+      const params: any[] = [];
+
+      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
+      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+
+      if (startDate && endDate) {
+        sql += ` WHERE substr(fecha,1,10) BETWEEN ? AND ?`;
+        params.push(startDate, endDate);
+      } else if (startDate) {
+        sql += ` WHERE substr(fecha,1,10) >= ?`;
+        params.push(startDate);
+      } else if (endDate) {
+        sql += ` WHERE substr(fecha,1,10) <= ?`;
+        params.push(endDate);
+      }
+
+      const row = db.prepare(sql).get(...params) as { total: number } | undefined;
+      return { totalConsumos: row?.total ?? 0 };
+    } catch (error) {
+      console.error('Error getCantidadTotalConsumos:', error);
+      return { totalConsumos: 0 };
+    }
+  }
+
+  /**
+   * 10) Distribución de productos por CATEGORÍA
+   */
+  static async getDistribucionProductosPorCategoria(): Promise<
+    Array<{ categoriaId: number; nombreCategoria: string; totalProductos: number }>
+  > {
+    try {
+      const sql = `
+        SELECT
+          c.id as categoriaId,
+          c.nombre as nombreCategoria,
+          COUNT(p.id) as totalProductos
+        FROM categories c
+        LEFT JOIN products p ON p.categoriaId = c.id
+        GROUP BY c.id
+        ORDER BY totalProductos DESC
+      `;
+      const rows = db.prepare(sql).all() as Array<{
+        categoriaId: number;
+        nombreCategoria: string;
+        totalProductos: number;
+      }>;
+
+      return rows;
+    } catch (error) {
+      console.error('Error getDistribucionProductosPorCategoria:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 11) Número de categorías activas vs. inactivas
+   */
+  static async getNumCategoriasActivasInactivas(): Promise<{
+    categoriasActivas: number;
+    categoriasInactivas: number;
+  }> {
+    try {
+      const rowActivas = db
+        .prepare(`SELECT COUNT(*) as count FROM categories WHERE activo = 1`)
+        .get() as { count: number };
+      const rowInactivas = db
+        .prepare(`SELECT COUNT(*) as count FROM categories WHERE activo = 0`)
+        .get() as { count: number };
+
+      return {
+        categoriasActivas: rowActivas.count,
+        categoriasInactivas: rowInactivas.count,
+      };
+    } catch (error) {
+      console.error('Error getNumCategoriasActivasInactivas:', error);
+      return { categoriasActivas: 0, categoriasInactivas: 0 };
+    }
+  }
+
+  /**
+   * 12) (NUEVO) Total de piezas en el inventario:
+   *     - Suma la columna 'cantidadActual' de lotes (solo lotes activos).
+   */
+  static async getTotalPiezasInventario(): Promise<{ totalPiezas: number }> {
+    try {
+      const row = db.prepare(`
+        SELECT SUM(l.cantidadActual) as total
+        FROM lotes l
+        WHERE l.activo = 1
+      `).get() as { total: number } | undefined;
+
+      return { totalPiezas: row?.total ?? 0 };
+    } catch (error) {
+      console.error('Error getTotalPiezasInventario:', error);
+      return { totalPiezas: 0 };
     }
   }
 }

@@ -1,4 +1,3 @@
-// electron/main/ipcHandlers.ts
 import { ipcMain } from 'electron';
 import { UserService } from './services/UserService';
 import { CategoryService } from './services/CategoryService';
@@ -7,6 +6,9 @@ import { ProductService } from './services/ProductService';
 import { PurchaseService } from './services/PurchaseService';
 import { LoteService } from './services/LoteService';
 import { SalesService } from './services/SalesService';
+
+// IMPORTAMOS EL STATS SERVICE (ajusta la ruta si difiere)
+import { StatsService } from './services/StatsService';
 
 export function setupIpcHandlers() {
 
@@ -291,7 +293,7 @@ export function setupIpcHandlers() {
   });
 
   ipcMain.handle('delete-sale', async (_event, id) => {
-    // Ejemplo, si no lo has implementado:
+    // Ejemplo si no implementas la eliminación de venta:
     return { success: false, error: 'delete-sale not implemented' };
   });
 
@@ -301,6 +303,126 @@ export function setupIpcHandlers() {
     } catch (error) {
       console.error('Error get-detalles-by-venta:', error);
       return [];
+    }
+  });
+
+  // ========== STATS ==========
+
+  ipcMain.handle('stats-getTotalComprasPorFecha', async (_event, { fechaInicio, fechaFin }) => {
+    try {
+      return await StatsService.getTotalComprasPorFecha(fechaInicio, fechaFin);
+    } catch (error) {
+      console.error('Error stats-getTotalComprasPorFecha:', error);
+      return { totalCompras: 0 };
+    }
+  });
+
+  ipcMain.handle('stats-getComprasPorProveedor', async (_event, { fechaInicio, fechaFin }) => {
+    try {
+      return await StatsService.getComprasPorProveedor(fechaInicio, fechaFin);
+    } catch (error) {
+      console.error('Error stats-getComprasPorProveedor:', error);
+      return [];
+    }
+  });
+
+  // getTotalProductosActivos
+  ipcMain.handle('stats-getTotalProductosActivos', async () => {
+    try {
+      return await StatsService.getTotalProductosActivos();
+    } catch (error) {
+      console.error('Error stats-getTotalProductosActivos:', error);
+      return { totalProductos: 0 };
+    }
+  });
+
+  // getInversionCompraPorProducto
+  ipcMain.handle('stats-getInversionCompraPorProducto', async () => {
+    try {
+      return await StatsService.getInversionCompraPorProducto();
+    } catch (error) {
+      console.error('Error stats-getInversionCompraPorProducto:', error);
+      return [];
+    }
+  });
+
+  // getValorTotalInventario
+  ipcMain.handle('stats-getValorTotalInventario', async () => {
+    try {
+      return await StatsService.getValorTotalInventario();
+    } catch (error) {
+      console.error('Error stats-getValorTotalInventario:', error);
+      return { valorInventario: 0 };
+    }
+  });
+
+  // getStockActualPorProducto
+  ipcMain.handle('stats-getStockActualPorProducto', async () => {
+    try {
+      return await StatsService.getStockActualPorProducto();
+    } catch (error) {
+      console.error('Error stats-getStockActualPorProducto:', error);
+      return [];
+    }
+  });
+
+  // getProductosProximosACaducar
+  ipcMain.handle('stats-getProductosProximosACaducar', async (_event, dias) => {
+    try {
+      return await StatsService.getProductosProximosACaducar(dias);
+    } catch (error) {
+      console.error('Error stats-getProductosProximosACaducar:', error);
+      return [];
+    }
+  });
+
+  // getConsumosPorMotivo
+  ipcMain.handle('stats-getConsumosPorMotivo', async () => {
+    try {
+      return await StatsService.getConsumosPorMotivo();
+    } catch (error) {
+      console.error('Error stats-getConsumosPorMotivo:', error);
+      return [];
+    }
+  });
+
+  // getCantidadTotalConsumos
+  ipcMain.handle('stats-getCantidadTotalConsumos', async (_event, { fechaInicio, fechaFin }) => {
+    try {
+      return await StatsService.getCantidadTotalConsumos(fechaInicio, fechaFin);
+    } catch (error) {
+      console.error('Error stats-getCantidadTotalConsumos:', error);
+      return { totalConsumos: 0 };
+    }
+  });
+
+  // getDistribucionProductosPorCategoria
+  ipcMain.handle('stats-getDistribucionProductosPorCategoria', async () => {
+    try {
+      return await StatsService.getDistribucionProductosPorCategoria();
+    } catch (error) {
+      console.error('Error stats-getDistribucionProductosPorCategoria:', error);
+      return [];
+    }
+  });
+
+  // getNumCategoriasActivasInactivas
+  ipcMain.handle('stats-getNumCategoriasActivasInactivas', async () => {
+    try {
+      return await StatsService.getNumCategoriasActivasInactivas();
+    } catch (error) {
+      console.error('Error stats-getNumCategoriasActivasInactivas:', error);
+      return { categoriasActivas: 0, categoriasInactivas: 0 };
+    }
+  });
+
+  // ========== NUEVO: stats-getTotalPiezasInventario ==========
+  ipcMain.handle('stats-getTotalPiezasInventario', async () => {
+    try {
+      return await StatsService.getTotalPiezasInventario();
+    } catch (error) {
+      console.error('Error stats-getTotalPiezasInventario:', error);
+      return { totalPiezas: 0 };
     }
   });
 }

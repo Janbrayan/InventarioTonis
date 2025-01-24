@@ -53,8 +53,8 @@ export interface FrontPurchase {
 }
 
 /**
- * Interfaz del detalle de la compra:
- * Aquí agregamos los nuevos campos que manejas en tu lógica de contenedores.
+ * Interfaz del detalle de la compra,
+ * con campos opcionales de contenedores.
  */
 export interface FrontDetalleCompra {
   id?: number;
@@ -66,10 +66,9 @@ export interface FrontDetalleCompra {
   lote?: string;
   fechaCaducidad?: string;
 
-  // === Campos opcionales de contenedor ===
   tipoContenedor?: 'unidad' | 'caja' | 'paquete';
   unidadesPorContenedor?: number;
-  piezasIngresadas?: number; // Si deseas enviarlo también
+  piezasIngresadas?: number;
 }
 
 /**
@@ -85,7 +84,7 @@ export interface FrontLote {
   activo?: boolean;
 }
 
-// === (Opcional) Interfaces de Venta en el front ===
+// === (Opcional) Interfaces de Venta en el front
 export interface FrontSale {
   id?: number;
   fecha?: string;
@@ -152,7 +151,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateLote: (loteData: FrontLote & { id: number }) => ipcRenderer.invoke('update-lote', loteData),
   deleteLote: (id: number) => ipcRenderer.invoke('delete-lote', id),
 
-  // ============= AGREGAMOS LA LLAMADA "descontar-por-consumo" =============
+  // === Consumir lotes por merma / consumo interno
   descontarPorConsumo: (data: { loteId: number; cantidad: number; motivo?: string }) =>
     ipcRenderer.invoke('descontar-por-consumo', data),
 
@@ -160,5 +159,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSales: () => ipcRenderer.invoke('get-sales'),
   createSale: (saleData: FrontSale) => ipcRenderer.invoke('create-sale', saleData),
   deleteSale: (id: number) => ipcRenderer.invoke('delete-sale', id),
-  getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId)
+  getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),
+
+  // ========== ESTADÍSTICAS ==========
+  statsGetTotalComprasPorFecha: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('stats-getTotalComprasPorFecha', { fechaInicio, fechaFin }),
+
+  statsGetComprasPorProveedor: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('stats-getComprasPorProveedor', { fechaInicio, fechaFin }),
+
+  statsGetTotalProductosActivos: () =>
+    ipcRenderer.invoke('stats-getTotalProductosActivos'),
+
+  statsGetInversionCompraPorProducto: () =>
+    ipcRenderer.invoke('stats-getInversionCompraPorProducto'),
+
+  statsGetValorTotalInventario: () =>
+    ipcRenderer.invoke('stats-getValorTotalInventario'),
+
+  statsGetStockActualPorProducto: () =>
+    ipcRenderer.invoke('stats-getStockActualPorProducto'),
+
+  statsGetProductosProximosACaducar: (dias: number) =>
+    ipcRenderer.invoke('stats-getProductosProximosACaducar', dias),
+
+  statsGetConsumosPorMotivo: () =>
+    ipcRenderer.invoke('stats-getConsumosPorMotivo'),
+
+  statsGetCantidadTotalConsumos: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('stats-getCantidadTotalConsumos', { fechaInicio, fechaFin }),
+
+  statsGetDistribucionProductosPorCategoria: () =>
+    ipcRenderer.invoke('stats-getDistribucionProductosPorCategoria'),
+
+  statsGetNumCategoriasActivasInactivas: () =>
+    ipcRenderer.invoke('stats-getNumCategoriasActivasInactivas'),
+
+  // === NUEVO: total de piezas en inventario
+  statsGetTotalPiezasInventario: () =>
+    ipcRenderer.invoke('stats-getTotalPiezasInventario'),
 });
