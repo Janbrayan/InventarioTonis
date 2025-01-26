@@ -1,10 +1,10 @@
 // electron/main/services/StatsService.ts
+
 import db from '../db';
 
 export class StatsService {
   /**
-   * 1) Total de COMPRAS en un periodo (suma de la columna "total" en purchases).
-   *    - Filtra usando substr(fecha,1,10) entre fechaInicio y fechaFin.
+   * 1) Total de COMPRAS en un periodo
    */
   static async getTotalComprasPorFecha(
     fechaInicio?: string,
@@ -14,8 +14,9 @@ export class StatsService {
       let sql = `SELECT SUM(total) as total FROM purchases`;
       const params: any[] = [];
 
-      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
-      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+      // Normalizamos fechaInicio/fechaFin a undefined si vienen vacías
+      const startDate = fechaInicio && fechaInicio.trim() ? fechaInicio.trim() : undefined;
+      const endDate   = fechaFin    && fechaFin.trim()    ? fechaFin.trim()    : undefined;
 
       if (startDate && endDate) {
         sql += ` WHERE substr(fecha,1,10) BETWEEN ? AND ?`;
@@ -28,6 +29,9 @@ export class StatsService {
         params.push(endDate);
       }
 
+      console.log('SQL getTotalComprasPorFecha:', sql);
+      console.log('Params getTotalComprasPorFecha:', params);
+
       const row = db.prepare(sql).get(...params) as { total: number } | undefined;
       return { totalCompras: row?.total ?? 0 };
     } catch (error) {
@@ -37,7 +41,7 @@ export class StatsService {
   }
 
   /**
-   * 2) Compras por PROVEEDOR:
+   * 2) Compras por PROVEEDOR (filtradas por fecha).
    */
   static async getComprasPorProveedor(
     fechaInicio?: string,
@@ -55,8 +59,8 @@ export class StatsService {
       const conditions: string[] = [];
       const params: any[] = [];
 
-      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
-      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+      const startDate = fechaInicio && fechaInicio.trim() ? fechaInicio.trim() : undefined;
+      const endDate   = fechaFin    && fechaFin.trim()    ? fechaFin.trim()    : undefined;
 
       if (startDate && endDate) {
         conditions.push(`substr(pc.fecha,1,10) BETWEEN ? AND ?`);
@@ -74,6 +78,9 @@ export class StatsService {
       }
 
       sql += ` GROUP BY p.id ORDER BY totalCompras DESC`;
+
+      console.log('SQL getComprasPorProveedor:', sql);
+      console.log('Params getComprasPorProveedor:', params);
 
       const rows = db.prepare(sql).all(...params) as Array<{
         proveedorId: number;
@@ -105,10 +112,12 @@ export class StatsService {
   }
 
   /**
-   * 4) Inversión de compra POR producto:
-   *    - Suma (cantidad * precioUnitario) en detail_compras.
+   * 4) Inversión de compra POR producto, **con** filtro de fecha.
    */
-  static async getInversionCompraPorProducto(): Promise<
+  static async getInversionCompraPorProducto(
+    fechaInicio?: string,
+    fechaFin?: string
+  ): Promise<
     Array<{
       productoId: number;
       nombreProducto: string;
@@ -116,7 +125,7 @@ export class StatsService {
     }>
   > {
     try {
-      const sql = `
+      let sql = `
         SELECT
           p.id as productoId,
           p.nombre as nombreProducto,
@@ -124,10 +133,38 @@ export class StatsService {
         FROM products p
         LEFT JOIN detail_compras dc ON dc.productoId = p.id
         LEFT JOIN purchases pr ON pr.id = dc.compraId
+      `;
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      const startDate = fechaInicio && fechaInicio.trim() ? fechaInicio.trim() : undefined;
+      const endDate   = fechaFin    && fechaFin.trim()    ? fechaFin.trim()    : undefined;
+
+      if (startDate && endDate) {
+        conditions.push(`substr(pr.fecha,1,10) BETWEEN ? AND ?`);
+        params.push(startDate, endDate);
+      } else if (startDate) {
+        conditions.push(`substr(pr.fecha,1,10) >= ?`);
+        params.push(startDate);
+      } else if (endDate) {
+        conditions.push(`substr(pr.fecha,1,10) <= ?`);
+        params.push(endDate);
+      }
+
+      if (conditions.length > 0) {
+        sql += ` WHERE ` + conditions.join(' AND ');
+      }
+
+      sql += `
         GROUP BY p.id
         ORDER BY inversionTotal DESC
       `;
-      const rows = db.prepare(sql).all() as Array<{
+
+      console.log('SQL getInversionCompraPorProducto:', sql);
+      console.log('Params getInversionCompraPorProducto:', params);
+
+      const rows = db.prepare(sql).all(...params) as Array<{
         productoId: number;
         nombreProducto: string;
         inversionTotal: number;
@@ -179,6 +216,8 @@ export class StatsService {
         GROUP BY l.productoId
         ORDER BY stockTotal DESC
       `;
+      console.log('SQL getStockActualPorProducto:', sql);
+
       const rows = db.prepare(sql).all() as Array<{
         productoId: number;
         nombreProducto: string;
@@ -213,6 +252,8 @@ export class StatsService {
           AND date(l.fechaCaducidad) <= date('now', ?)
         ORDER BY l.fechaCaducidad ASC
       `;
+      console.log('SQL getProductosProximosACaducar:', sql, `+${dias} days`);
+
       const rows = db.prepare(sql).all(`+${dias} days`) as Array<{
         loteId: number;
         productoId: number;
@@ -248,6 +289,8 @@ export class StatsService {
         GROUP BY ci.motivo
         ORDER BY cantidadTotal DESC
       `;
+      console.log('SQL getConsumosPorMotivo:', sql);
+
       const rows = db.prepare(sql).all() as Array<{
         motivo: string;
         totalConsumos: number;
@@ -272,8 +315,8 @@ export class StatsService {
       let sql = `SELECT SUM(cantidad) as total FROM consumos_internos`;
       const params: any[] = [];
 
-      const startDate = fechaInicio && fechaInicio.trim() !== '' ? fechaInicio.trim() : undefined;
-      const endDate = fechaFin && fechaFin.trim() !== '' ? fechaFin.trim() : undefined;
+      const startDate = fechaInicio && fechaInicio.trim() ? fechaInicio.trim() : undefined;
+      const endDate   = fechaFin    && fechaFin.trim()    ? fechaFin.trim()    : undefined;
 
       if (startDate && endDate) {
         sql += ` WHERE substr(fecha,1,10) BETWEEN ? AND ?`;
@@ -285,6 +328,9 @@ export class StatsService {
         sql += ` WHERE substr(fecha,1,10) <= ?`;
         params.push(endDate);
       }
+
+      console.log('SQL getCantidadTotalConsumos:', sql);
+      console.log('Params getCantidadTotalConsumos:', params);
 
       const row = db.prepare(sql).get(...params) as { total: number } | undefined;
       return { totalConsumos: row?.total ?? 0 };
@@ -311,6 +357,8 @@ export class StatsService {
         GROUP BY c.id
         ORDER BY totalProductos DESC
       `;
+      console.log('SQL getDistribucionProductosPorCategoria:', sql);
+
       const rows = db.prepare(sql).all() as Array<{
         categoriaId: number;
         nombreCategoria: string;
@@ -350,8 +398,7 @@ export class StatsService {
   }
 
   /**
-   * 12) (NUEVO) Total de piezas en el inventario:
-   *     - Suma la columna 'cantidadActual' de lotes (solo lotes activos).
+   * 12) Total de piezas en el inventario (lotes activos).
    */
   static async getTotalPiezasInventario(): Promise<{ totalPiezas: number }> {
     try {
@@ -360,6 +407,8 @@ export class StatsService {
         FROM lotes l
         WHERE l.activo = 1
       `).get() as { total: number } | undefined;
+
+      console.log('SQL getTotalPiezasInventario: SELECT SUM(l.cantidadActual) as total ...');
 
       return { totalPiezas: row?.total ?? 0 };
     } catch (error) {

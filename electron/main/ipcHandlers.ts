@@ -1,3 +1,4 @@
+// ipcHandlers.ts
 import { ipcMain } from 'electron';
 import { UserService } from './services/UserService';
 import { CategoryService } from './services/CategoryService';
@@ -6,12 +7,9 @@ import { ProductService } from './services/ProductService';
 import { PurchaseService } from './services/PurchaseService';
 import { LoteService } from './services/LoteService';
 import { SalesService } from './services/SalesService';
-
-// IMPORTAMOS EL STATS SERVICE (ajusta la ruta si difiere)
 import { StatsService } from './services/StatsService';
 
 export function setupIpcHandlers() {
-
   // ========== LOGIN ==========
   ipcMain.handle('login-user', async (_event, { username, password }) => {
     try {
@@ -308,7 +306,8 @@ export function setupIpcHandlers() {
 
   // ========== STATS ==========
 
-  ipcMain.handle('stats-getTotalComprasPorFecha', async (_event, { fechaInicio, fechaFin }) => {
+  // 1) TotalComprasPorFecha (2 parámetros)
+  ipcMain.handle('stats-getTotalComprasPorFecha', async (_event, fechaInicio?: string, fechaFin?: string) => {
     try {
       return await StatsService.getTotalComprasPorFecha(fechaInicio, fechaFin);
     } catch (error) {
@@ -317,7 +316,8 @@ export function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('stats-getComprasPorProveedor', async (_event, { fechaInicio, fechaFin }) => {
+  // 2) ComprasPorProveedor (2 parámetros)
+  ipcMain.handle('stats-getComprasPorProveedor', async (_event, fechaInicio?: string, fechaFin?: string) => {
     try {
       return await StatsService.getComprasPorProveedor(fechaInicio, fechaFin);
     } catch (error) {
@@ -326,7 +326,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getTotalProductosActivos
+  // 3) TotalProductosActivos (sin parámetros)
   ipcMain.handle('stats-getTotalProductosActivos', async () => {
     try {
       return await StatsService.getTotalProductosActivos();
@@ -336,17 +336,17 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getInversionCompraPorProducto
-  ipcMain.handle('stats-getInversionCompraPorProducto', async () => {
+  // 4) InversionCompraPorProducto (2 parámetros)
+  ipcMain.handle('stats-getInversionCompraPorProducto', async (_event, fechaInicio?: string, fechaFin?: string) => {
     try {
-      return await StatsService.getInversionCompraPorProducto();
+      return await StatsService.getInversionCompraPorProducto(fechaInicio, fechaFin);
     } catch (error) {
       console.error('Error stats-getInversionCompraPorProducto:', error);
       return [];
     }
   });
 
-  // getValorTotalInventario
+  // 5) ValorTotalInventario (sin parámetros)
   ipcMain.handle('stats-getValorTotalInventario', async () => {
     try {
       return await StatsService.getValorTotalInventario();
@@ -356,7 +356,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getStockActualPorProducto
+  // 6) StockActualPorProducto
   ipcMain.handle('stats-getStockActualPorProducto', async () => {
     try {
       return await StatsService.getStockActualPorProducto();
@@ -366,7 +366,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getProductosProximosACaducar
+  // 7) ProductosProximosACaducar
   ipcMain.handle('stats-getProductosProximosACaducar', async (_event, dias) => {
     try {
       return await StatsService.getProductosProximosACaducar(dias);
@@ -376,7 +376,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getConsumosPorMotivo
+  // 8) ConsumosPorMotivo
   ipcMain.handle('stats-getConsumosPorMotivo', async () => {
     try {
       return await StatsService.getConsumosPorMotivo();
@@ -386,8 +386,8 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getCantidadTotalConsumos
-  ipcMain.handle('stats-getCantidadTotalConsumos', async (_event, { fechaInicio, fechaFin }) => {
+  // 9) CantidadTotalConsumos (2 parámetros)
+  ipcMain.handle('stats-getCantidadTotalConsumos', async (_event, fechaInicio?: string, fechaFin?: string) => {
     try {
       return await StatsService.getCantidadTotalConsumos(fechaInicio, fechaFin);
     } catch (error) {
@@ -396,7 +396,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getDistribucionProductosPorCategoria
+  // 10) DistribucionProductosPorCategoria (sin parámetros)
   ipcMain.handle('stats-getDistribucionProductosPorCategoria', async () => {
     try {
       return await StatsService.getDistribucionProductosPorCategoria();
@@ -406,7 +406,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // getNumCategoriasActivasInactivas
+  // 11) NumCategoriasActivasInactivas (sin parámetros)
   ipcMain.handle('stats-getNumCategoriasActivasInactivas', async () => {
     try {
       return await StatsService.getNumCategoriasActivasInactivas();
@@ -416,7 +416,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // ========== NUEVO: stats-getTotalPiezasInventario ==========
+  // 12) TotalPiezasInventario (sin parámetros)
   ipcMain.handle('stats-getTotalPiezasInventario', async () => {
     try {
       return await StatsService.getTotalPiezasInventario();

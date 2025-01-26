@@ -49,6 +49,8 @@ interface DetalleCompra {
   fechaCaducidad?: string;
   tipoContenedor?: 'unidad' | 'caja' | 'paquete';
   unidadesPorContenedor?: number;
+  /** NUEVO: campo para manejar el precio de venta */
+  precioVenta?: number;
 }
 
 interface Purchase {
@@ -136,9 +138,11 @@ export default function Compras() {
   const [precioUnitStr, setPrecioUnitStr] = useState('');
   const [lote, setLote] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
-
   const [tipoContenedor, setTipoContenedor] = useState<'unidad' | 'caja' | 'paquete'>('unidad');
   const [unidadesPorContenedorStr, setUnidadesPorContenedorStr] = useState('1');
+
+  // NUEVO: campo para capturar el precioVenta
+  const [precioVentaStr, setPrecioVentaStr] = useState('');
 
   useEffect(() => {
     fetchAll();
@@ -179,6 +183,7 @@ export default function Compras() {
    * Interpreta lo que ingrese el usuario:
    * - "cantidadStr" => cuántas unidades/cajas/paquetes
    * - "precioUnitStr" => precio unitario (depende del tipo)
+   * - "precioVentaStr" => precio de venta
    */
   function addRenglonDetalle() {
     if (!selProductoId) {
@@ -188,6 +193,7 @@ export default function Compras() {
     const c = parseFloat(cantidadStr) || 0;
     const p = parseFloat(precioUnitStr) || 0;
     const upc = parseFloat(unidadesPorContenedorStr) || 1;
+    const pv = parseFloat(precioVentaStr) || 0;
 
     if (c <= 0) {
       alert('La cantidad debe ser mayor a 0.');
@@ -211,6 +217,7 @@ export default function Compras() {
       fechaCaducidad: fechaCaducidad || undefined,
       tipoContenedor,
       unidadesPorContenedor: upc,
+      precioVenta: pv, // Guardamos el precio de venta
     };
     setDetalles((prev) => [...prev, nuevo]);
 
@@ -222,6 +229,7 @@ export default function Compras() {
     setFechaCaducidad('');
     setTipoContenedor('unidad');
     setUnidadesPorContenedorStr('1');
+    setPrecioVentaStr('');
   }
 
   function removeRenglonDetalle(idx: number) {
@@ -233,18 +241,16 @@ export default function Compras() {
   /**
    * Calcula el total final sumando cada renglón según la lógica:
    * - unidad: sub = cantidad * precioUnitario
-   * - caja:   sub = #cajas * (precioUnitario es total de la caja)
-   * - paquete: sub = #paquetes * (#piezasPorPaquete) * (precioUnitario es por pieza)
+   * - caja:   sub = #cajas * precioUnitario
+   * - paquete: sub = #paquetes * (#piezasPorPaquete) * precioUnitario
    */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => {
       let sub = 0;
       if (d.tipoContenedor === 'paquete') {
-        // "precioUnitario" lo interpretamos como PRECIO POR PIEZA
         const upc = d.unidadesPorContenedor ?? 1;
         sub = d.cantidad * upc * d.precioUnitario;
       } else if (d.tipoContenedor === 'caja') {
-        // "precioUnitario" lo interpretamos como PRECIO DE LA CAJA COMPLETA
         sub = d.cantidad * d.precioUnitario;
       } else {
         // unidad
@@ -571,12 +577,21 @@ export default function Compras() {
               sx={{ width: 150 }}
             />
 
+            {/* NUEVO: Campo para capturar precioVenta */}
+            <TextField
+              label="P.Venta"
+              type="text"
+              sx={{ width: 100 }}
+              value={precioVentaStr}
+              onChange={(e) => setPrecioVentaStr(e.target.value)}
+            />
+
             <Button variant="outlined" color="info" onClick={addRenglonDetalle}>
               Agregar
             </Button>
           </Box>
 
-          {/* TABLA DE DETALLES - mostrando subtotales y la columna "Precio x Pieza" */}
+          {/* TABLA DE DETALLES - mostrando subtotales, precio x pieza y precioVenta */}
           <TableContainer component={Paper} sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
@@ -591,6 +606,8 @@ export default function Compras() {
                   <TableCell>Piezas Totales</TableCell>
                   <TableCell>Lote</TableCell>
                   <TableCell>Caducidad</TableCell>
+                  {/* NUEVO: Columna para Precio Venta */}
+                  <TableCell>Precio Venta</TableCell>
                   <TableCell>Quitar</TableCell>
                 </TableRow>
               </TableHead>
@@ -617,7 +634,6 @@ export default function Compras() {
                   } else {
                     // "unidad"
                     sub = d.cantidad * d.precioUnitario;
-                    // precioPorPieza = precioUnitario
                     precioPorPieza = d.precioUnitario;
                   }
 
@@ -649,6 +665,10 @@ export default function Compras() {
                           : '—'
                         }
                       </TableCell>
+                      {/* NUEVO: Mostrar precioVenta en la tabla */}
+                      <TableCell>
+                        {typeof d.precioVenta === 'number' ? `$${d.precioVenta}` : '—'}
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="contained"
@@ -664,7 +684,7 @@ export default function Compras() {
                 })}
                 {detalles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} align="center">
+                    <TableCell colSpan={12} align="center">
                       Sin renglones aún
                     </TableCell>
                   </TableRow>
@@ -724,9 +744,8 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detallesCompra.map((d) => {
-                  const pName =
-                    products.find((pp) => pp.id === d.productoId)?.nombre ||
-                    `ID=${d.productoId}`;
+                  const product = products.find((pp) => pp.id === d.productoId);
+                  const pName = product?.nombre || `ID=${d.productoId}`;
 
                   let sub = 0;
                   const upc = d.unidadesPorContenedor ?? 1;
@@ -747,7 +766,7 @@ export default function Compras() {
                       ? d.cantidad
                       : d.cantidad * upc;
 
-                  // Obtenemos el precio por pieza si te lo proporciona el backend:
+                  // Obtenemos el precio por pieza del detalle (si lo maneja tu backend)
                   const precioPorPieza = d.precioPorPieza
                     ? d.precioPorPieza.toFixed(2)
                     : '—';

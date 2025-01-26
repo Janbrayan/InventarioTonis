@@ -20,9 +20,6 @@ interface DBDetalleCompra {
   subtotal: number;
   lote: string | null;
   fechaCaducidad: string | null;
-  // tipoContenedor?: string | null;        (Si lo definiste)
-  // unidadesPorContenedor?: number | null;
-  // piezasIngresadas?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,7 +56,10 @@ export interface DetalleCompra {
 
   tipoContenedor?: 'unidad' | 'caja' | 'paquete';
   unidadesPorContenedor?: number;
-  piezasIngresadas?: number;   // total de piezas resultantes
+  piezasIngresadas?: number;
+
+  // AGREGADO: Para almacenar también el precio de venta si lo deseas actualizar en products
+  precioVenta?: number;
 }
 
 export class PurchaseService {
@@ -112,8 +112,9 @@ export class PurchaseService {
       );
       const compraId = result.lastInsertRowid as number;
 
-      // 2) Insertar detalles en 'detail_compras' (incluimos tipoContenedor, unidPorCont, piezasIngresadas)
-      if (purchase.detalles && purchase.detalles.length > 0) {
+      // 2) Insertar detalles en 'detail_compras'
+      const detalles = purchase.detalles || [];
+      if (detalles.length > 0) {
         const stmtDetalle = db.prepare(`
           INSERT INTO detail_compras
             (compraId, productoId, cantidad, precioUnitario, subtotal,
@@ -124,24 +125,26 @@ export class PurchaseService {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        // AGREGADO: Statement para actualizar el precioCompra en la tabla products
+        // AGREGADO: Statement para actualizar el precioCompra **y precioVenta** en la tabla products
         const stmtUpdateProduct = db.prepare(`
           UPDATE products
-          SET precioCompra = ?, updatedAt = ?
+          SET 
+            precioCompra = ?, 
+            precioVenta = ?,  -- AGREGADO
+            updatedAt = ?
           WHERE id = ?
         `);
 
-        for (const det of purchase.detalles) {
+        for (const det of detalles) {
           // Calculamos el subtotal.
           // - "paquete": cant * unidPorCont * precio
-          // - "caja" o "unidad": cant * precio (depende de tu lógica de negocio)
+          // - "caja" o "unidad": cant * precio (depende de tu lógica)
           let sub = det.cantidad * det.precioUnitario;
           if (det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // Si quieres que "caja" se comporte igual a "paquete",
-          // descomenta:
+          // Si deseas que "caja" se comporte igual a "paquete", descomenta:
           // else if (det.tipoContenedor === 'caja') {
           //   const upc = det.unidadesPorContenedor ?? 1;
           //   sub = det.cantidad * upc * det.precioUnitario;
@@ -160,14 +163,11 @@ export class PurchaseService {
             const upc = det.unidadesPorContenedor ?? 1;
             precioPorPieza = det.precioUnitario / upc;
           } else if (det.tipoContenedor === 'paquete') {
-            // Dependiendo de tu lógica, si "paquete" significa "precioUnitario" es
-            // precio total del paquete, entonces dividirías igual que con la caja;
-            // si ya es "por pieza", lo dejas tal cual.
-            // Aquí se asume que "precioUnitario" ya es por pieza.
+            // Si "precioUnitario" ya es por pieza, no hace falta dividir
             precioPorPieza = det.precioUnitario;
           }
 
-          // 2.1) Insertar el detalle
+          // 2.1) Insertar el detalle en 'detail_compras'
           stmtDetalle.run(
             compraId,
             det.productoId,
@@ -179,14 +179,19 @@ export class PurchaseService {
             det.tipoContenedor ?? null,
             det.unidadesPorContenedor ?? 1,
             piezas,
-            precioPorPieza,  // AGREGADO
+            precioPorPieza, // AGREGADO
             now,
             now
           );
 
-          // 2.2) Actualizar precioCompra en products
+          // 2.2) Actualizar precioCompra y precioVenta en products
+          // Si en tu front-end recibes det.precioVenta, la usas aquí. 
+          // Si no, puedes usar un valor por defecto (p.ej. 0).
+          const nuevoPrecioVenta = det.precioVenta ?? 0;
+
           stmtUpdateProduct.run(
-            precioPorPieza,  // Nuevo precio de compra
+            precioPorPieza,     // Nuevo precio de compra
+            nuevoPrecioVenta,   // Nuevo precio de venta (AGREGADO)
             now,
             det.productoId
           );
@@ -195,7 +200,7 @@ export class PurchaseService {
 
       // 3) Insertar en 'lotes'
       //    Calculamos la "cantidadActual" multiplicando si es caja/paquete.
-      if (purchase.detalles && purchase.detalles.length > 0) {
+      if (detalles.length > 0) {
         const stmtLote = db.prepare(`
           INSERT INTO lotes
             (productoId, lote, fechaCaducidad, cantidadActual,
@@ -203,8 +208,7 @@ export class PurchaseService {
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
 
-        for (const det of purchase.detalles) {
-          // Cantidad real de piezas al inventario
+        for (const det of detalles) {
           let realCantidad = det.cantidad;
           if (det.tipoContenedor === 'paquete' || det.tipoContenedor === 'caja') {
             const upc = det.unidadesPorContenedor ?? 1;
@@ -215,8 +219,8 @@ export class PurchaseService {
             det.productoId,
             det.lote ?? null,
             det.fechaCaducidad ?? null,
-            realCantidad,   // cantidad total
-            1,              // activo = true
+            realCantidad,
+            1,   // activo = true
             now,
             now
           );
@@ -235,7 +239,6 @@ export class PurchaseService {
 
   /**
    * OBTENER DETALLES de una compra
-   * (si tu tabla detail_compras tiene estas columnas, inclúyelas en el SELECT).
    */
   static async getDetallesByCompraId(compraId: number): Promise<DetalleCompra[]> {
     try {
@@ -248,7 +251,7 @@ export class PurchaseService {
           precioPorPieza  -- AGREGADO: si ya existe en tu tabla detail_compras
         FROM detail_compras
         WHERE compraId = ?
-      `).all(compraId) as any[]; // Podrías definir un DBDetalleCompra ampliado
+      `).all(compraId) as any[]; // o define un tipo DBDetalleCompra con las columnas extras
 
       return rows.map((r) => ({
         id: r.id,
@@ -264,7 +267,6 @@ export class PurchaseService {
         piezasIngresadas: r.piezasIngresadas ?? undefined,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
-        // AGREGADO: incluir precioPorPieza (si lo necesitas mostrar)
         precioPorPieza: r.precioPorPieza ?? undefined,
       }));
     } catch (error) {
@@ -274,8 +276,7 @@ export class PurchaseService {
   }
 
   /**
-   * Actualiza SOLO el encabezado de la compra.
-   * (No actualiza detalles ni lotes.)
+   * Actualiza SOLO el encabezado de la compra (no los detalles).
    */
   static async updatePurchase(purchase: Purchase & { id: number }): Promise<{ success: boolean }> {
     try {
@@ -301,7 +302,8 @@ export class PurchaseService {
   }
 
   /**
-   * Elimina compra + detalles (y podrías eliminar lotes si aplica).
+   * Elimina compra + detalles
+   * (y podrías eliminar lotes si así lo deseas).
    */
   static async deletePurchase(id: number): Promise<{ success: boolean }> {
     const tx = db.transaction(() => {

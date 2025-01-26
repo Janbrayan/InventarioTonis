@@ -12,7 +12,7 @@ import {
   TableHead,
   TableRow,
   TableCell,
-  TableBody
+  TableBody,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -46,7 +46,6 @@ interface DistribucionCategoria {
   nombreCategoria: string;
   totalProductos: number;
 }
-/** Filas para Detalle de Inventario */
 interface DetalleInventarioRow {
   productoId: number;
   nombreProducto: string;
@@ -56,29 +55,39 @@ interface DetalleInventarioRow {
 }
 
 export default function Estadisticas() {
-  // Filtros de fecha
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Datos principales
+  // ========== DATOS GENERALES SIN FILTRO ==========
   const [categoriasData, setCategoriasData] = useState<DistribucionCategoria[]>([]);
-  const [comprasProveedoresData, setComprasProveedoresData] = useState<ComprasProveedor[]>([]);
-  const [inversionData, setInversionData] = useState<InversionProducto[]>([]);
-
-  // Mini-stats
+  const [detalleInventario, setDetalleInventario] = useState<DetalleInventarioRow[]>([]);
   const [totalProductosActivos, setTotalProductosActivos] = useState(0);
   const [valorTotalInventario, setValorTotalInventario] = useState(0);
   const [totalPiezasInventario, setTotalPiezasInventario] = useState(0);
 
-  // Detalle de Inventario
-  const [detalleInventario, setDetalleInventario] = useState<DetalleInventarioRow[]>([]);
+  // ========== FILTROS: COMPRAS POR PROVEEDOR ==========
+  // NOTA: Ahora inician como string vacío '' en lugar de hoy
+  const [fechaInicioProv, setFechaInicioProv] = useState('');
+  const [fechaFinProv, setFechaFinProv] = useState('');
+  const [comprasProveedoresData, setComprasProveedoresData] = useState<ComprasProveedor[]>([]);
 
+  // ========== FILTROS: INVERSIÓN POR PRODUCTO ==========
+  const [fechaInicioInv, setFechaInicioInv] = useState('');
+  const [fechaFinInv, setFechaFinInv] = useState('');
+  const [inversionData, setInversionData] = useState<InversionProducto[]>([]);
+
+  // Carga inicial de datos
   useEffect(() => {
-    cargarEstadisticas();
+    (async () => {
+      await cargarDatosGenerales();
+      await cargarComprasProveedores();
+      await cargarInversionProductos();
+    })();
   }, []);
 
-  async function cargarEstadisticas() {
+  /**
+   * Carga estadísticas que NO dependen de rangos (inventario, etc.)
+   */
+  async function cargarDatosGenerales() {
     try {
       setLoading(true);
 
@@ -86,15 +95,7 @@ export default function Estadisticas() {
       const cats = await window.electronAPI.statsGetDistribucionProductosPorCategoria();
       setCategoriasData(cats || []);
 
-      // 2) Compras por Proveedor
-      const provData = await window.electronAPI.statsGetComprasPorProveedor(fechaInicio, fechaFin);
-      setComprasProveedoresData(provData || []);
-
-      // 3) Inversión de compra por producto
-      const invData = await window.electronAPI.statsGetInversionCompraPorProducto();
-      setInversionData(invData || []);
-
-      // Mini-stats
+      // 2) Stats inventario
       const totalProd = await window.electronAPI.statsGetTotalProductosActivos();
       setTotalProductosActivos(totalProd.totalProductos);
 
@@ -104,11 +105,12 @@ export default function Estadisticas() {
       const { totalPiezas } = await window.electronAPI.statsGetTotalPiezasInventario();
       setTotalPiezasInventario(totalPiezas);
 
-      // Detalle Inventario: unimos “stock actual” con la lista de productos
+      // 3) Detalle de Inventario
       const stockData = await window.electronAPI.statsGetStockActualPorProducto();
       const allProducts = await window.electronAPI.getProducts();
 
-      const merged = stockData.map((s: any) => {
+      // Unimos el stock con el precioCompra para calcular "valor"
+      const merged: DetalleInventarioRow[] = stockData.map((s: any) => {
         const prod = allProducts.find((p: any) => p.id === s.productoId) || {};
         const precioCompra = prod.precioCompra || 0;
         return {
@@ -116,21 +118,64 @@ export default function Estadisticas() {
           nombreProducto: s.nombreProducto,
           stockTotal: s.stockTotal,
           precioCompra,
-          valor: s.stockTotal * precioCompra
+          valor: s.stockTotal * precioCompra,
         };
       });
       setDetalleInventario(merged);
     } catch (error) {
-      console.error('Error al cargar estadísticas:', error);
+      console.error('Error cargarDatosGenerales:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleFiltrar() {
-    cargarEstadisticas();
+  /**
+   * Carga COMPRAS POR PROVEEDOR con fechaInicioProv y fechaFinProv
+   */
+  async function cargarComprasProveedores() {
+    try {
+      setLoading(true);
+
+      console.log('cargarComprasProveedores -> fechaInicioProv:', fechaInicioProv);
+      console.log('cargarComprasProveedores -> fechaFinProv:', fechaFinProv);
+
+      // Llamada con dos parámetros (pueden ser '', lo que en tu backend
+      // interpretará como "sin filtro" si tu StatsService está preparado para ello)
+      const provData = await window.electronAPI.statsGetComprasPorProveedor(
+        fechaInicioProv,
+        fechaFinProv
+      );
+      setComprasProveedoresData(provData || []);
+    } catch (error) {
+      console.error('Error cargarComprasProveedores:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
+  /**
+   * Carga INVERSIÓN POR PRODUCTO con fechaInicioInv y fechaFinInv
+   */
+  async function cargarInversionProductos() {
+    try {
+      setLoading(true);
+
+      console.log('cargarInversionProductos -> fechaInicioInv:', fechaInicioInv);
+      console.log('cargarInversionProductos -> fechaFinInv:', fechaFinInv);
+
+      const invData = await window.electronAPI.statsGetInversionCompraPorProducto(
+        fechaInicioInv,
+        fechaFinInv
+      );
+      setInversionData(invData || []);
+    } catch (error) {
+      console.error('Error cargarInversionProductos:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Render principal
   if (loading) {
     return <p>Cargando estadísticas...</p>;
   }
@@ -138,9 +183,15 @@ export default function Estadisticas() {
   // Paleta de colores para PieChart
   const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#845EC2', '#FF5E78'];
 
-  // Totales para la tabla final de inventario
-  const totalPiezasInventarioDetalle = detalleInventario.reduce((acc, d) => acc + d.stockTotal, 0);
-  const totalValorDetalle = detalleInventario.reduce((acc, d) => acc + d.valor, 0);
+  // Cálculos totales de la tabla de inventario
+  const totalPiezasInventarioDetalle = detalleInventario.reduce(
+    (acc, d) => acc + d.stockTotal,
+    0
+  );
+  const totalValorDetalle = detalleInventario.reduce(
+    (acc, d) => acc + d.valor,
+    0
+  );
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -148,42 +199,13 @@ export default function Estadisticas() {
         Estadísticas
       </Typography>
 
-      {/* FILTROS DE FECHA */}
-      <Card sx={{ mb: 3, p: 2 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Fecha Inicio"
-              type="date"
-              fullWidth
-              value={fechaInicio}
-              onChange={(e) => setFechaInicio(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Fecha Fin"
-              type="date"
-              fullWidth
-              value={fechaFin}
-              onChange={(e) => setFechaFin(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-          <Grid item xs={12} md={2}>
-            <Button variant="contained" color="primary" onClick={handleFiltrar}>
-              Filtrar
-            </Button>
-          </Grid>
-        </Grid>
-      </Card>
-
       {/* (1) Detalle de Productos Activos */}
       <Card sx={{ borderRadius: 2, boxShadow: 3, mb: 3 }}>
         <CardHeader
           title="Detalle de Productos Activos"
-          subheader="Piezas por producto y valor"
+          subheader={`Total: ${totalProductosActivos} | Valor Inv: $${valorTotalInventario.toFixed(
+            2
+          )} | Piezas Totales: ${totalPiezasInventario}`}
           sx={{ backgroundColor: '#343a40', pb: 1, color: '#fff' }}
         />
         <CardContent sx={{ backgroundColor: '#1c2430' }}>
@@ -219,7 +241,9 @@ export default function Estadisticas() {
               ))}
               {detalleInventario.length > 0 && (
                 <TableRow>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>TOTAL</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
+                    TOTAL
+                  </TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="right">
                     {totalPiezasInventarioDetalle}
                   </TableCell>
@@ -241,11 +265,11 @@ export default function Estadisticas() {
         </CardContent>
       </Card>
 
-      {/* (2) Distribución de productos por categoría: PieChart + Tabla */}
+      {/* (2) Distribución de productos por categoría */}
       <Card sx={{ borderRadius: 2, boxShadow: 3, mb: 3 }}>
         <CardHeader
           title="Distribución de Productos por Categoría"
-          subheader="PieChart + Lista"
+          subheader="PieChart + Lista (sin filtro de fecha)"
           sx={{ backgroundColor: '#343a40', pb: 1, color: '#fff' }}
         />
         <CardContent sx={{ backgroundColor: '#1c2430' }}>
@@ -266,14 +290,7 @@ export default function Estadisticas() {
                       {categoriasData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={[
-                            '#0088FE',
-                            '#00C49F',
-                            '#FFBB28',
-                            '#FF8042',
-                            '#845EC2',
-                            '#FF5E78',
-                          ][index % 6]}
+                          fill={pieColors[index % pieColors.length]}
                         />
                       ))}
                     </Pie>
@@ -316,14 +333,48 @@ export default function Estadisticas() {
         </CardContent>
       </Card>
 
-      {/* (3) COMPRAS POR PROVEEDOR: Chart + Tabla */}
+      {/* (3) COMPRAS POR PROVEEDOR (filtro de fecha) */}
       <Card sx={{ borderRadius: 2, boxShadow: 3, mb: 3 }}>
         <CardHeader
           title="Compras por Proveedor"
-          subheader="Gráfica + Lista"
+          subheader="Gráfica + Lista (Filtrar por fecha)"
           sx={{ backgroundColor: '#343a40', pb: 1, color: '#fff' }}
         />
         <CardContent sx={{ backgroundColor: '#1c2430' }}>
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={5}>
+              <TextField
+                label="Fecha Inicio"
+                type="date"
+                fullWidth
+                value={fechaInicioProv}
+                onChange={(e) => setFechaInicioProv(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={5}>
+              <TextField
+                label="Fecha Fin"
+                type="date"
+                fullWidth
+                value={fechaFinProv}
+                onChange={(e) => setFechaFinProv(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={cargarComprasProveedores}
+              >
+                Filtrar
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Gráfica + Tabla */}
           <Grid container spacing={2}>
             <Grid item xs={12} md={7}>
               <Box sx={{ height: 300, border: '1px solid #444' }}>
@@ -378,25 +429,67 @@ export default function Estadisticas() {
         </CardContent>
       </Card>
 
-      {/* (4) Inversión de compra por producto: Chart + Tabla */}
+      {/* (4) Inversión de compra por producto (filtro de fecha) */}
       <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
         <CardHeader
           title="Inversión de Compra por Producto"
-          subheader="Barras + Lista"
+          subheader="Barras + Lista (Filtrar por fecha)"
           sx={{ backgroundColor: '#343a40', pb: 1, color: '#fff' }}
         />
         <CardContent sx={{ backgroundColor: '#1c2430' }}>
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={5}>
+              <TextField
+                label="Fecha Inicio"
+                type="date"
+                fullWidth
+                value={fechaInicioInv}
+                onChange={(e) => setFechaInicioInv(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={5}>
+              <TextField
+                label="Fecha Fin"
+                type="date"
+                fullWidth
+                value={fechaFinInv}
+                onChange={(e) => setFechaFinInv(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={cargarInversionProductos}
+              >
+                Filtrar
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Gráfica + Tabla */}
           <Grid container spacing={2}>
             <Grid item xs={12} md={7}>
               <Box sx={{ height: 300, border: '1px solid #444' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={inversionData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+                  <BarChart
+                    data={inversionData}
+                    margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                     <XAxis dataKey="nombreProducto" stroke="#ccc" tick={{ fill: '#ccc' }} />
                     <YAxis stroke="#ccc" tick={{ fill: '#ccc' }} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="inversionTotal" fill="#00C49F" name="Inversión ($)" barSize={30} />
+                    <Bar
+                      dataKey="inversionTotal"
+                      fill="#00C49F"
+                      name="Inversión ($)"
+                      barSize={30}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </Box>

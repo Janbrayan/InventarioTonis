@@ -161,41 +161,53 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteSale: (id: number) => ipcRenderer.invoke('delete-sale', id),
   getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),
 
-  // ========== ESTADÍSTICAS ==========
+  // ========== ESTADÍSTICAS (dos parámetros) ==========
+  
+  // 1) TotalComprasPorFecha
   statsGetTotalComprasPorFecha: (fechaInicio?: string, fechaFin?: string) =>
-    ipcRenderer.invoke('stats-getTotalComprasPorFecha', { fechaInicio, fechaFin }),
+    ipcRenderer.invoke('stats-getTotalComprasPorFecha', fechaInicio, fechaFin),
 
+  // 2) ComprasPorProveedor
   statsGetComprasPorProveedor: (fechaInicio?: string, fechaFin?: string) =>
-    ipcRenderer.invoke('stats-getComprasPorProveedor', { fechaInicio, fechaFin }),
+    ipcRenderer.invoke('stats-getComprasPorProveedor', fechaInicio, fechaFin),
 
+  // 3) TotalProductosActivos (sin parámetros)
   statsGetTotalProductosActivos: () =>
     ipcRenderer.invoke('stats-getTotalProductosActivos'),
 
-  statsGetInversionCompraPorProducto: () =>
-    ipcRenderer.invoke('stats-getInversionCompraPorProducto'),
+  // 4) InversionCompraPorProducto
+  statsGetInversionCompraPorProducto: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('stats-getInversionCompraPorProducto', fechaInicio, fechaFin),
 
+  // 5) ValorTotalInventario (sin parámetros)
   statsGetValorTotalInventario: () =>
     ipcRenderer.invoke('stats-getValorTotalInventario'),
 
+  // 6) StockActualPorProducto
   statsGetStockActualPorProducto: () =>
     ipcRenderer.invoke('stats-getStockActualPorProducto'),
 
+  // 7) ProductosProximosACaducar
   statsGetProductosProximosACaducar: (dias: number) =>
     ipcRenderer.invoke('stats-getProductosProximosACaducar', dias),
 
+  // 8) ConsumosPorMotivo
   statsGetConsumosPorMotivo: () =>
     ipcRenderer.invoke('stats-getConsumosPorMotivo'),
 
+  // 9) CantidadTotalConsumos (dos parámetros)
   statsGetCantidadTotalConsumos: (fechaInicio?: string, fechaFin?: string) =>
-    ipcRenderer.invoke('stats-getCantidadTotalConsumos', { fechaInicio, fechaFin }),
+    ipcRenderer.invoke('stats-getCantidadTotalConsumos', fechaInicio, fechaFin),
 
+  // 10) DistribucionProductosPorCategoria (sin parámetros)
   statsGetDistribucionProductosPorCategoria: () =>
     ipcRenderer.invoke('stats-getDistribucionProductosPorCategoria'),
 
+  // 11) NumCategoriasActivasInactivas (sin parámetros)
   statsGetNumCategoriasActivasInactivas: () =>
     ipcRenderer.invoke('stats-getNumCategoriasActivasInactivas'),
 
-  // === NUEVO: total de piezas en inventario
+  // 12) TotalPiezasInventario
   statsGetTotalPiezasInventario: () =>
     ipcRenderer.invoke('stats-getTotalPiezasInventario'),
 });

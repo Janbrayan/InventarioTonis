@@ -15,62 +15,65 @@ declare global {
         user?: { name?: string };
       }>;
 
-      // CRUD USUARIOS
+      // === CRUD USUARIOS ===
       getUsers: () => Promise<any>;
       createUser: (user: any) => Promise<{ success: boolean }>;
       updateUser: (user: any) => Promise<{ success: boolean }>;
       deleteUser: (id: number) => Promise<{ success: boolean }>;
 
-      // CRUD PROVEEDORES
+      // === CRUD PROVEEDORES ===
       getProviders: () => Promise<any>;
       createProvider: (provData: any) => Promise<{ success: boolean }>;
       updateProvider: (provData: any) => Promise<{ success: boolean }>;
       deleteProvider: (id: number) => Promise<{ success: boolean }>;
 
-      // CRUD CATEGORIAS
+      // === CRUD CATEGORIAS ===
       getCategories: () => Promise<any>;
       createCategory: (catData: any) => Promise<{ success: boolean }>;
       updateCategory: (catData: any) => Promise<{ success: boolean }>;
       deleteCategory: (id: number) => Promise<{ success: boolean }>;
 
-      // CRUD PRODUCTOS
+      // === CRUD PRODUCTOS ===
       getProducts: () => Promise<any>;
       createProduct: (prodData: any) => Promise<{ success: boolean }>;
       updateProduct: (prodData: any) => Promise<{ success: boolean }>;
       deleteProduct: (id: number) => Promise<{ success: boolean }>;
 
-      // CRUD LOTES (INVENTARIO)
+      // === CRUD LOTES (INVENTARIO) ===
       getLotes: () => Promise<any>;
       createLote: (loteData: any) => Promise<{ success: boolean }>;
       updateLote: (loteData: any) => Promise<{ success: boolean }>;
       deleteLote: (id: number) => Promise<{ success: boolean }>;
 
-      // COMPRAS
+      // === COMPRAS ===
       getPurchases: () => Promise<any>;
       createPurchase: (purchaseData: any) => Promise<{ success: boolean }>;
       updatePurchase: (purchaseData: any) => Promise<{ success: boolean }>;
       deletePurchase: (id: number) => Promise<{ success: boolean }>;
       getDetallesByCompra: (compraId: number) => Promise<any>;
 
-      // VENTAS
+      // === VENTAS ===
       getSales: () => Promise<any>;
       createSale: (saleData: any) => Promise<{ success: boolean }>;
       deleteSale: (id: number) => Promise<{ success: boolean }>;
       getDetallesByVenta: (ventaId: number) => Promise<any>;
 
-      // === Función para descontar por consumo interno / merma
+      // === Consumir lotes por merma / consumo interno
       descontarPorConsumo: (data: {
         loteId: number;
         cantidad: number;
         motivo?: string;
       }) => Promise<{ success: boolean }>;
 
-      // ========== STATS (Actualizado) ==========
-      statsGetTotalComprasPorFecha: (params: {
-        fechaInicio?: string;
-        fechaFin?: string;
-      }) => Promise<{ totalCompras: number }>;
+      // ========== ESTADÍSTICAS ==========
 
+      // 1) Total de compras (dos parámetros opcionales)
+      statsGetTotalComprasPorFecha: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<{ totalCompras: number }>;
+
+      // 2) Compras por proveedor (dos parámetros opcionales)
       statsGetComprasPorProveedor: (
         fechaInicio?: string,
         fechaFin?: string
@@ -82,13 +85,16 @@ declare global {
         }>
       >;
 
-      // NUEVO 1) Cantidad total de productos activos
+      // 3) Total de productos activos (sin parámetros)
       statsGetTotalProductosActivos: () => Promise<{
         totalProductos: number;
       }>;
 
-      // NUEVO 2) Inversión de compra por producto
-      statsGetInversionCompraPorProducto: () => Promise<
+      // 4) Inversión por producto (dos parámetros)
+      statsGetInversionCompraPorProducto: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<
         Array<{
           productoId: number;
           nombreProducto: string;
@@ -96,11 +102,12 @@ declare global {
         }>
       >;
 
-      // NUEVO 3) Valor total de inventario
+      // 5) Valor total de inventario (sin parámetros)
       statsGetValorTotalInventario: () => Promise<{
         valorInventario: number;
       }>;
 
+      // 6) Stock actual por producto
       statsGetStockActualPorProducto: () => Promise<
         Array<{
           productoId: number;
@@ -109,7 +116,10 @@ declare global {
         }>
       >;
 
-      statsGetProductosProximosACaducar: (dias: number) => Promise<
+      // 7) Productos próximos a caducar
+      statsGetProductosProximosACaducar: (
+        dias: number
+      ) => Promise<
         Array<{
           productoId: number;
           nombreProducto: string;
@@ -118,6 +128,7 @@ declare global {
         }>
       >;
 
+      // 8) Consumos agrupados por motivo
       statsGetConsumosPorMotivo: () => Promise<
         Array<{
           motivo: string;
@@ -126,11 +137,13 @@ declare global {
         }>
       >;
 
-      statsGetCantidadTotalConsumos: (params: {
-        fechaInicio?: string;
-        fechaFin?: string;
-      }) => Promise<{ totalConsumos: number }>;
+      // 9) Cantidad total de consumos en un rango (dos parámetros)
+      statsGetCantidadTotalConsumos: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<{ totalConsumos: number }>;
 
+      // 10) Distribución de productos por categoría
       statsGetDistribucionProductosPorCategoria: () => Promise<
         Array<{
           categoriaId: number;
@@ -139,12 +152,13 @@ declare global {
         }>
       >;
 
+      // 11) N° de categorías activas / inactivas
       statsGetNumCategoriasActivasInactivas: () => Promise<{
         categoriasActivas: number;
         categoriasInactivas: number;
       }>;
 
-      // NUEVO 4) Total de piezas en el inventario
+      // 12) Total de piezas en inventario
       statsGetTotalPiezasInventario: () => Promise<{
         totalPiezas: number;
       }>;
