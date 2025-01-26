@@ -236,7 +236,9 @@ export class StatsService {
    */
   static async getProductosProximosACaducar(
     dias = 30
-  ): Promise<Array<{ productoId: number; nombreProducto: string; loteId: number; fechaCaducidad: string }>> {
+  ): Promise<
+    Array<{ productoId: number; nombreProducto: string; loteId: number; fechaCaducidad: string }>
+  > {
     try {
       const sql = `
         SELECT

@@ -1,5 +1,6 @@
 // electron/main/services/ProviderService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 interface DBProvider {
   id: number;
@@ -57,7 +58,8 @@ export class ProviderService {
    */
   static async createProvider(prov: Provider): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Hora local de México
+      const now = getHoraLocalCDMX();
       db.prepare(`
         INSERT INTO providers
           (nombre, contacto, telefono, email, activo, createdAt, updatedAt)
@@ -83,7 +85,7 @@ export class ProviderService {
    */
   static async updateProvider(prov: Provider & { id: number }): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      const now = getHoraLocalCDMX();
       db.prepare(`
         UPDATE providers
         SET nombre = ?,

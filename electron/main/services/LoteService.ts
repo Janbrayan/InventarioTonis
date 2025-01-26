@@ -1,5 +1,6 @@
 // electron/main/services/LoteService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 interface DBLote {
   id: number;
@@ -34,7 +35,6 @@ export interface ConsumoData {
 
 /** LoteService: Manejo CRUD de 'lotes' + método de 'consumo interno' */
 export class LoteService {
-
   /**
    * Obtiene la lista completa de lotes.
    */
@@ -70,7 +70,8 @@ export class LoteService {
    */
   static async createLote(l: Lote): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Usamos hora local de la Ciudad de México
+      const now = getHoraLocalCDMX();
       db.prepare(`
         INSERT INTO lotes
           (productoId, detalleCompraId, lote, fechaCaducidad,
@@ -98,7 +99,7 @@ export class LoteService {
    */
   static async updateLote(l: Lote & { id: number }): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      const now = getHoraLocalCDMX();
       db.prepare(`
         UPDATE lotes
         SET
@@ -144,7 +145,8 @@ export class LoteService {
    */
   static async descontarPorConsumo(data: ConsumoData): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Hora local para la fecha de consumo
+      const now = getHoraLocalCDMX();
 
       // 1) Insertar un registro en "consumos_internos"
       db.prepare(`
@@ -154,9 +156,9 @@ export class LoteService {
         data.loteId,
         data.cantidad,
         data.motivo ?? null,
-        now,      // fecha de consumo
-        now,      // createdAt
-        now       // updatedAt
+        now,    // fecha de consumo
+        now,    // createdAt
+        now     // updatedAt
       );
 
       // 2) Actualizar lotes: restar 'cantidadActual'
@@ -167,7 +169,10 @@ export class LoteService {
       `).run(data.cantidad, data.loteId);
 
       // Opcionalmente, si llega a 0 => activo=0
-      const row = db.prepare('SELECT cantidadActual FROM lotes WHERE id=?').get(data.loteId) as { cantidadActual: number } | undefined;
+      const row = db
+        .prepare('SELECT cantidadActual FROM lotes WHERE id=?')
+        .get(data.loteId) as { cantidadActual: number } | undefined;
+
       if (row && row.cantidadActual <= 0) {
         db.prepare(`
           UPDATE lotes

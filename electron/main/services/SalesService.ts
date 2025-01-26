@@ -1,5 +1,6 @@
 // electron/main/services/SalesService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 /** Interfaz del encabezado de la Venta */
 export interface Sale {
@@ -43,7 +44,6 @@ interface DBLoteRow {
  * Servicio de Ventas, con lógica FEFO (descontar lote con caducidad más próxima).
  */
 export class SalesService {
-
   /** Listar Ventas (encabezado) */
   static async getSales(): Promise<Sale[]> {
     try {
@@ -70,15 +70,19 @@ export class SalesService {
 
   /** Crear Venta (encabezado + detalles) + descontar lotes (FEFO) */
   static async createSale(sale: Sale): Promise<{ success: boolean }> {
-    const now = new Date().toISOString();
+    // Hora local de México
+    const now = getHoraLocalCDMX();
 
     const tx = db.transaction(() => {
       // 1) Insertar encabezado en 'sales'
+      //    Si el front no manda sale.fecha, usamos 'now'
+      const fechaVenta = sale.fecha ?? now;
+
       const result = db.prepare(`
         INSERT INTO sales (fecha, total, observaciones, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?)
       `).run(
-        sale.fecha ?? now,
+        fechaVenta,
         sale.total ?? 0,
         sale.observaciones ?? null,
         now,
@@ -98,13 +102,13 @@ export class SalesService {
         `);
 
         for (const det of sale.detalles) {
-          // Subtotal según la lógica de contenedores
+          // Subtotal según contenedores
           let sub = det.cantidad * det.precioUnitario;
           if (det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // (Si "caja" también multiplica, añádelo)
+          // Si "caja" también multiplica, agrégalo
 
           // piezasVendidas
           let piezas = det.cantidad;
@@ -124,8 +128,8 @@ export class SalesService {
             piezas,
             det.lote ?? null,
             det.fechaCaducidad ?? null,
-            now,
-            now
+            now,  // createdAt
+            now   // updatedAt
           );
         }
       }
@@ -133,7 +137,6 @@ export class SalesService {
       // 3) Descontar inventario en 'lotes' según FEFO (fecha más próxima).
       if (sale.detalles && sale.detalles.length > 0) {
         for (const det of sale.detalles) {
-          // Calculamos cuántas piezas se deben descontar
           let piezas = det.cantidad;
           if (det.tipoContenedor === 'caja' || det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
@@ -142,7 +145,7 @@ export class SalesService {
 
           let toDiscount = piezas;
 
-          // FEFO: ordenamos por fechaCaducidad ASC, y luego id
+          // FEFO: ordenamos por fechaCaducidad ASC, luego id
           while (toDiscount > 0) {
             const loteRow = db.prepare(`
               SELECT

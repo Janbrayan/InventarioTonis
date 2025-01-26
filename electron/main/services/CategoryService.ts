@@ -1,5 +1,6 @@
 // electron/main/services/CategoryService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 interface DBCategory {
   id: number;
@@ -46,7 +47,9 @@ export class CategoryService {
    */
   static async createCategory(cat: Category): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Obtenemos la hora local de la Ciudad de México
+      const now = getHoraLocalCDMX();
+
       db.prepare(`
         INSERT INTO categories (nombre, activo, createdAt, updatedAt)
         VALUES (?, ?, ?, ?)
@@ -66,9 +69,12 @@ export class CategoryService {
   /**
    * Actualiza los datos de una categoría existente.
    */
-  static async updateCategory(cat: Category & { id: number }): Promise<{ success: boolean }> {
+  static async updateCategory(
+    cat: Category & { id: number }
+  ): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      const now = getHoraLocalCDMX();
+
       db.prepare(`
         UPDATE categories
         SET nombre = ?, activo = ?, updatedAt = ?

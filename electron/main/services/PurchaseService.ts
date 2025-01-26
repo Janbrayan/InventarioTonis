@@ -1,5 +1,6 @@
 // electron/main/services/PurchaseService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 interface DBPurchase {
   id: number;
@@ -95,16 +96,20 @@ export class PurchaseService {
    * calculando correctamente la cantidad total de piezas si es "caja" o "paquete".
    */
   static async createPurchase(purchase: Purchase): Promise<{ success: boolean }> {
-    const now = new Date().toISOString();
+    // Hora local de México
+    const now = getHoraLocalCDMX();
 
     const tx = db.transaction(() => {
       // 1) Insertar el encabezado en 'purchases'
+      //    Si el front no manda "fecha", usaremos `now` por defecto
+      const fechaCompra = purchase.fecha ?? now;
+
       const result = db.prepare(`
         INSERT INTO purchases (proveedorId, fecha, total, observaciones, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(
         purchase.proveedorId,
-        purchase.fecha ?? now,
+        fechaCompra,
         purchase.total ?? 0,
         purchase.observaciones ?? null,
         now,
@@ -136,34 +141,32 @@ export class PurchaseService {
         `);
 
         for (const det of detalles) {
-          // Calculamos el subtotal.
-          // - "paquete": cant * unidPorCont * precio
-          // - "caja" o "unidad": cant * precio (depende de tu lógica)
+          // Calculamos el subtotal, según la lógica contenedores
           let sub = det.cantidad * det.precioUnitario;
           if (det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // Si deseas que "caja" se comporte igual a "paquete", descomenta:
+          // Si "caja" funcionara igual a "paquete", descomenta:
           // else if (det.tipoContenedor === 'caja') {
           //   const upc = det.unidadesPorContenedor ?? 1;
           //   sub = det.cantidad * upc * det.precioUnitario;
           // }
 
-          // Calculamos piezasIngresadas:
+          // Calculamos piezasIngresadas
           let piezas = det.cantidad;
           if (det.tipoContenedor === 'paquete' || det.tipoContenedor === 'caja') {
             const upc = det.unidadesPorContenedor ?? 1;
             piezas = det.cantidad * upc;
           }
 
-          // AGREGADO: Cálculo de precioPorPieza
+          // AGREGADO: precioPorPieza
           let precioPorPieza = det.precioUnitario;
           if (det.tipoContenedor === 'caja') {
             const upc = det.unidadesPorContenedor ?? 1;
             precioPorPieza = det.precioUnitario / upc;
           } else if (det.tipoContenedor === 'paquete') {
-            // Si "precioUnitario" ya es por pieza, no hace falta dividir
+            // Asumimos precioUnitario ya es "por pieza"
             precioPorPieza = det.precioUnitario;
           }
 
@@ -179,19 +182,16 @@ export class PurchaseService {
             det.tipoContenedor ?? null,
             det.unidadesPorContenedor ?? 1,
             piezas,
-            precioPorPieza, // AGREGADO
-            now,
-            now
+            precioPorPieza,
+            now,  // createdAt
+            now   // updatedAt
           );
 
-          // 2.2) Actualizar precioCompra y precioVenta en products
-          // Si en tu front-end recibes det.precioVenta, la usas aquí. 
-          // Si no, puedes usar un valor por defecto (p.ej. 0).
+          // 2.2) Actualizar precioCompra y precioVenta en products (opcional)
           const nuevoPrecioVenta = det.precioVenta ?? 0;
-
           stmtUpdateProduct.run(
-            precioPorPieza,     // Nuevo precio de compra
-            nuevoPrecioVenta,   // Nuevo precio de venta (AGREGADO)
+            precioPorPieza,    // Nuevo precio de compra
+            nuevoPrecioVenta,  // Nuevo precio de venta
             now,
             det.productoId
           );
@@ -248,7 +248,7 @@ export class PurchaseService {
           subtotal, lote, fechaCaducidad,
           tipoContenedor, unidadesPorContenedor, piezasIngresadas,
           createdAt, updatedAt,
-          precioPorPieza  -- AGREGADO: si ya existe en tu tabla detail_compras
+          precioPorPieza  -- AGREGADO si existe en tu tabla detail_compras
         FROM detail_compras
         WHERE compraId = ?
       `).all(compraId) as any[]; // o define un tipo DBDetalleCompra con las columnas extras
@@ -278,16 +278,23 @@ export class PurchaseService {
   /**
    * Actualiza SOLO el encabezado de la compra (no los detalles).
    */
-  static async updatePurchase(purchase: Purchase & { id: number }): Promise<{ success: boolean }> {
+  static async updatePurchase(
+    purchase: Purchase & { id: number }
+  ): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Hora local de México
+      const now = getHoraLocalCDMX();
+
+      // Igual que en create, si el front no manda fecha, usamos now
+      const fechaCompra = purchase.fecha ?? now;
+
       db.prepare(`
         UPDATE purchases
         SET proveedorId = ?, fecha = ?, total = ?, observaciones = ?, updatedAt = ?
         WHERE id = ?
       `).run(
         purchase.proveedorId,
-        purchase.fecha ?? now,
+        fechaCompra,
         purchase.total ?? 0,
         purchase.observaciones ?? null,
         now,

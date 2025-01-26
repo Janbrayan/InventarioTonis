@@ -1,5 +1,6 @@
 // electron/main/services/ProductService.ts
 import db from '../db';
+import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
 
 interface DBProduct {
   id: number;
@@ -60,7 +61,8 @@ export class ProductService {
    */
   static async createProduct(prod: Product): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      // Hora local de México
+      const now = getHoraLocalCDMX();
       db.prepare(`
         INSERT INTO products
           (nombre, categoriaId, precioCompra, precioVenta, codigoBarras,
@@ -87,9 +89,11 @@ export class ProductService {
   /**
    * Actualiza un producto existente.
    */
-  static async updateProduct(prod: Product & { id: number }): Promise<{ success: boolean }> {
+  static async updateProduct(
+    prod: Product & { id: number }
+  ): Promise<{ success: boolean }> {
     try {
-      const now = new Date().toISOString();
+      const now = getHoraLocalCDMX();
       db.prepare(`
         UPDATE products
         SET
