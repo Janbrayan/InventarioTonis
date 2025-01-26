@@ -13,6 +13,7 @@ import Inventario from './components/Inventario';
 import Compras from './components/Compras';
 import Ventas from './components/Ventas';
 import Estadisticas from './components/Estadisticas';
+import HistorialVentas from './components/HistorialVentas';
 
 // tus placeholders...
 // GestionProductos, Categorias, etc.
@@ -78,7 +79,7 @@ export default function AppRoutes() {
             <Route path="ventas">
               {/* ... */}
               <Route path='registro' element={<Ventas/>}/>
-              <Route path='historial'/>
+              <Route path='historial' element={<HistorialVentas/>}/>
               <Route path='estadisticas'/>
             </Route>
 

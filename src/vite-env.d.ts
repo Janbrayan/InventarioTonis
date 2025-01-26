@@ -68,14 +68,13 @@ declare global {
       }) => Promise<{ success: boolean }>;
 
       // ========== ESTADÍSTICAS ==========
-
-      // 1) Total de compras (dos parámetros opcionales)
+      // 1) Total de compras
       statsGetTotalComprasPorFecha: (
         fechaInicio?: string,
         fechaFin?: string
       ) => Promise<{ totalCompras: number }>;
 
-      // 2) Compras por proveedor (dos parámetros opcionales)
+      // 2) Compras por proveedor
       statsGetComprasPorProveedor: (
         fechaInicio?: string,
         fechaFin?: string
@@ -87,12 +86,12 @@ declare global {
         }>
       >;
 
-      // 3) Total de productos activos (sin parámetros)
+      // 3) Total de productos activos
       statsGetTotalProductosActivos: () => Promise<{
         totalProductos: number;
       }>;
 
-      // 4) Inversión por producto (dos parámetros)
+      // 4) Inversión por producto
       statsGetInversionCompraPorProducto: (
         fechaInicio?: string,
         fechaFin?: string
@@ -104,7 +103,7 @@ declare global {
         }>
       >;
 
-      // 5) Valor total de inventario (sin parámetros)
+      // 5) Valor total de inventario
       statsGetValorTotalInventario: () => Promise<{
         valorInventario: number;
       }>;
@@ -139,7 +138,7 @@ declare global {
         }>
       >;
 
-      // 9) Cantidad total de consumos en un rango (dos parámetros)
+      // 9) Cantidad total de consumos en un rango
       statsGetCantidadTotalConsumos: (
         fechaInicio?: string,
         fechaFin?: string
@@ -164,6 +163,18 @@ declare global {
       statsGetTotalPiezasInventario: () => Promise<{
         totalPiezas: number;
       }>;
-    }
+
+      // ========== HISTORIAL VENTAS (opcional) ==========
+      /** Trae todas las ventas */
+      historialGetAllVentas?: () => Promise<any>;
+
+      /** Trae los detalles de una venta específica */
+      historialGetDetallesByVentaId?: (ventaId: number) => Promise<any>;
+
+      /** Filtra ventas por rango (day, week, month, all) */
+      historialGetVentasByRange?: (
+        range: 'day' | 'week' | 'month' | 'all'
+      ) => Promise<any>;
+    };
   }
 }

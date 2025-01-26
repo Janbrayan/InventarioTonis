@@ -157,14 +157,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // === SALES (Ventas) ===
   getSales: () => ipcRenderer.invoke('get-sales'),
-  // (NUEVO) getSalesToday para ver solo ventas del día
   getSalesToday: () => ipcRenderer.invoke('get-sales-today'),
   createSale: (saleData: FrontSale) => ipcRenderer.invoke('create-sale', saleData),
   deleteSale: (id: number) => ipcRenderer.invoke('delete-sale', id),
   getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),
 
-  // ========== ESTADÍSTICAS (dos parámetros) ==========
-  
+  // ========== ESTADÍSTICAS ==========
+
   // 1) TotalComprasPorFecha
   statsGetTotalComprasPorFecha: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getTotalComprasPorFecha', fechaInicio, fechaFin),
@@ -173,7 +172,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   statsGetComprasPorProveedor: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getComprasPorProveedor', fechaInicio, fechaFin),
 
-  // 3) TotalProductosActivos (sin parámetros)
+  // 3) TotalProductosActivos
   statsGetTotalProductosActivos: () =>
     ipcRenderer.invoke('stats-getTotalProductosActivos'),
 
@@ -181,7 +180,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   statsGetInversionCompraPorProducto: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getInversionCompraPorProducto', fechaInicio, fechaFin),
 
-  // 5) ValorTotalInventario (sin parámetros)
+  // 5) ValorTotalInventario
   statsGetValorTotalInventario: () =>
     ipcRenderer.invoke('stats-getValorTotalInventario'),
 
@@ -197,19 +196,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   statsGetConsumosPorMotivo: () =>
     ipcRenderer.invoke('stats-getConsumosPorMotivo'),
 
-  // 9) CantidadTotalConsumos (dos parámetros)
+  // 9) CantidadTotalConsumos
   statsGetCantidadTotalConsumos: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getCantidadTotalConsumos', fechaInicio, fechaFin),
 
-  // 10) DistribucionProductosPorCategoria (sin parámetros)
+  // 10) DistribucionProductosPorCategoria
   statsGetDistribucionProductosPorCategoria: () =>
     ipcRenderer.invoke('stats-getDistribucionProductosPorCategoria'),
 
-  // 11) NumCategoriasActivasInactivas (sin parámetros)
+  // 11) NumCategoriasActivasInactivas
   statsGetNumCategoriasActivasInactivas: () =>
     ipcRenderer.invoke('stats-getNumCategoriasActivasInactivas'),
 
   // 12) TotalPiezasInventario
   statsGetTotalPiezasInventario: () =>
     ipcRenderer.invoke('stats-getTotalPiezasInventario'),
+
+  // ========== HISTORIAL DE VENTAS ==========
+  historialGetAllVentas: () => ipcRenderer.invoke('historial-getAllVentas'),
+  historialGetDetallesByVentaId: (ventaId: number) =>
+    ipcRenderer.invoke('historial-getDetallesByVentaId', ventaId),
+
+  // (NUEVO) Filtrar ventas por rango (day, week, month, all)
+  historialGetVentasByRange: (range: 'day' | 'week' | 'month' | 'all') =>
+    ipcRenderer.invoke('historial-getVentasByRange', range),
 });
