@@ -54,6 +54,14 @@ interface DetalleInventarioRow {
   valor: number; // stockTotal * precioCompra
 }
 
+/** Nuevo: interfaz para productos próximos a caducar */
+interface ProductoCaducar {
+  productoId: number;
+  nombreProducto: string;
+  loteId: number;
+  fechaCaducidad: string;
+}
+
 export default function Estadisticas() {
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +73,6 @@ export default function Estadisticas() {
   const [totalPiezasInventario, setTotalPiezasInventario] = useState(0);
 
   // ========== FILTROS: COMPRAS POR PROVEEDOR ==========
-  // NOTA: Ahora inician como string vacío '' en lugar de hoy
   const [fechaInicioProv, setFechaInicioProv] = useState('');
   const [fechaFinProv, setFechaFinProv] = useState('');
   const [comprasProveedoresData, setComprasProveedoresData] = useState<ComprasProveedor[]>([]);
@@ -75,12 +82,18 @@ export default function Estadisticas() {
   const [fechaFinInv, setFechaFinInv] = useState('');
   const [inversionData, setInversionData] = useState<InversionProducto[]>([]);
 
+  // ========== (NUEVO) FILTRO: PRODUCTOS PRÓXIMOS A CADUCAR ==========
+  // Lo manejamos como string para poder dejarlo vacío
+  const [diasCaducar, setDiasCaducar] = useState<string>(''); 
+  const [productosCaducar, setProductosCaducar] = useState<ProductoCaducar[]>([]);
+
   // Carga inicial de datos
   useEffect(() => {
     (async () => {
       await cargarDatosGenerales();
       await cargarComprasProveedores();
       await cargarInversionProductos();
+      await cargarProductosACaducar();
     })();
   }, []);
 
@@ -135,12 +148,6 @@ export default function Estadisticas() {
   async function cargarComprasProveedores() {
     try {
       setLoading(true);
-
-      console.log('cargarComprasProveedores -> fechaInicioProv:', fechaInicioProv);
-      console.log('cargarComprasProveedores -> fechaFinProv:', fechaFinProv);
-
-      // Llamada con dos parámetros (pueden ser '', lo que en tu backend
-      // interpretará como "sin filtro" si tu StatsService está preparado para ello)
       const provData = await window.electronAPI.statsGetComprasPorProveedor(
         fechaInicioProv,
         fechaFinProv
@@ -159,10 +166,6 @@ export default function Estadisticas() {
   async function cargarInversionProductos() {
     try {
       setLoading(true);
-
-      console.log('cargarInversionProductos -> fechaInicioInv:', fechaInicioInv);
-      console.log('cargarInversionProductos -> fechaFinInv:', fechaFinInv);
-
       const invData = await window.electronAPI.statsGetInversionCompraPorProducto(
         fechaInicioInv,
         fechaFinInv
@@ -170,6 +173,27 @@ export default function Estadisticas() {
       setInversionData(invData || []);
     } catch (error) {
       console.error('Error cargarInversionProductos:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * (NUEVO) Carga productos próximos a caducar
+   * Usamos parseInt(diasCaducar) => default 30 si está vacío o no es número
+   */
+  async function cargarProductosACaducar() {
+    try {
+      setLoading(true);
+
+      const parsed = parseInt(diasCaducar, 10);
+      // Si el valor es NaN (el usuario dejó en blanco) o < 1, definimos 30 por default
+      const finalDias = isNaN(parsed) || parsed < 1 ? 30 : parsed;
+
+      const data = await window.electronAPI.statsGetProductosProximosACaducar(finalDias);
+      setProductosCaducar(data || []);
+    } catch (error) {
+      console.error('Error cargarProductosACaducar:', error);
     } finally {
       setLoading(false);
     }
@@ -184,14 +208,8 @@ export default function Estadisticas() {
   const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#845EC2', '#FF5E78'];
 
   // Cálculos totales de la tabla de inventario
-  const totalPiezasInventarioDetalle = detalleInventario.reduce(
-    (acc, d) => acc + d.stockTotal,
-    0
-  );
-  const totalValorDetalle = detalleInventario.reduce(
-    (acc, d) => acc + d.valor,
-    0
-  );
+  const totalPiezasInventarioDetalle = detalleInventario.reduce((acc, d) => acc + d.stockTotal, 0);
+  const totalValorDetalle = detalleInventario.reduce((acc, d) => acc + d.valor, 0);
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -241,9 +259,7 @@ export default function Estadisticas() {
               ))}
               {detalleInventario.length > 0 && (
                 <TableRow>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
-                    TOTAL
-                  </TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>TOTAL</TableCell>
                   <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="right">
                     {totalPiezasInventarioDetalle}
                   </TableCell>
@@ -344,8 +360,8 @@ export default function Estadisticas() {
           <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <Grid item xs={12} sm={5}>
               <TextField
-                label="Fecha Inicio"
                 type="date"
+                label="Fecha Inicio"
                 fullWidth
                 value={fechaInicioProv}
                 onChange={(e) => setFechaInicioProv(e.target.value)}
@@ -354,8 +370,8 @@ export default function Estadisticas() {
             </Grid>
             <Grid item xs={12} sm={5}>
               <TextField
-                label="Fecha Fin"
                 type="date"
+                label="Fecha Fin"
                 fullWidth
                 value={fechaFinProv}
                 onChange={(e) => setFechaFinProv(e.target.value)}
@@ -364,6 +380,7 @@ export default function Estadisticas() {
             </Grid>
             <Grid item xs={12} sm={2}>
               <Button
+                type="button"              // <---- Importante para evitar reload
                 variant="contained"
                 color="primary"
                 fullWidth
@@ -430,7 +447,7 @@ export default function Estadisticas() {
       </Card>
 
       {/* (4) Inversión de compra por producto (filtro de fecha) */}
-      <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
+      <Card sx={{ borderRadius: 2, boxShadow: 3, mb: 3 }}>
         <CardHeader
           title="Inversión de Compra por Producto"
           subheader="Barras + Lista (Filtrar por fecha)"
@@ -440,8 +457,8 @@ export default function Estadisticas() {
           <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
             <Grid item xs={12} sm={5}>
               <TextField
-                label="Fecha Inicio"
                 type="date"
+                label="Fecha Inicio"
                 fullWidth
                 value={fechaInicioInv}
                 onChange={(e) => setFechaInicioInv(e.target.value)}
@@ -450,8 +467,8 @@ export default function Estadisticas() {
             </Grid>
             <Grid item xs={12} sm={5}>
               <TextField
-                label="Fecha Fin"
                 type="date"
+                label="Fecha Fin"
                 fullWidth
                 value={fechaFinInv}
                 onChange={(e) => setFechaFinInv(e.target.value)}
@@ -460,6 +477,7 @@ export default function Estadisticas() {
             </Grid>
             <Grid item xs={12} sm={2}>
               <Button
+                type="button"              // <---- Importante
                 variant="contained"
                 color="primary"
                 fullWidth
@@ -484,12 +502,7 @@ export default function Estadisticas() {
                     <YAxis stroke="#ccc" tick={{ fill: '#ccc' }} />
                     <Tooltip />
                     <Legend />
-                    <Bar
-                      dataKey="inversionTotal"
-                      fill="#00C49F"
-                      name="Inversión ($)"
-                      barSize={30}
-                    />
+                    <Bar dataKey="inversionTotal" fill="#00C49F" name="Inversión ($)" barSize={30} />
                   </BarChart>
                 </ResponsiveContainer>
               </Box>
@@ -524,6 +537,69 @@ export default function Estadisticas() {
               </Table>
             </Grid>
           </Grid>
+        </CardContent>
+      </Card>
+
+      {/* (NUEVO) (5) Productos próximos a CADUCAR (filtro de días) */}
+      <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
+        <CardHeader
+          title="Productos próximos a Caducar"
+          subheader="Tabla (Filtrar por días restantes)"
+          sx={{ backgroundColor: '#343a40', pb: 1, color: '#fff' }}
+        />
+        <CardContent sx={{ backgroundColor: '#1c2430' }}>
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={10}>
+              <TextField
+                label="Días para Caducar"
+                type="number"
+                fullWidth
+                value={diasCaducar}
+                onChange={(e) => setDiasCaducar(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                type="button"              // <---- Importante
+                variant="contained"
+                color="secondary"
+                fullWidth
+                onClick={cargarProductosACaducar}
+              >
+                Filtrar
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Tabla de Productos Próximos a Caducar */}
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ color: '#fff' }}>Producto</TableCell>
+                <TableCell sx={{ color: '#fff' }}>Lote ID</TableCell>
+                <TableCell sx={{ color: '#fff' }}>Fecha Caducidad</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {productosCaducar.map((item) => (
+                <TableRow key={item.loteId}>
+                  <TableCell sx={{ color: '#fff' }}>{item.nombreProducto}</TableCell>
+                  <TableCell sx={{ color: '#fff' }}>{item.loteId}</TableCell>
+                  <TableCell sx={{ color: '#fff' }}>
+                    {new Date(item.fechaCaducidad).toLocaleDateString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {productosCaducar.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} align="center" sx={{ color: '#fff' }}>
+                    Sin datos
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </Box>
