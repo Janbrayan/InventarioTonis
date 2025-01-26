@@ -281,6 +281,16 @@ export function setupIpcHandlers() {
     }
   });
 
+  // (NUEVO) getSalesToday
+  ipcMain.handle('get-sales-today', async () => {
+    try {
+      return await SalesService.getSalesToday();
+    } catch (error) {
+      console.error('Error get-sales-today:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle('create-sale', async (_event, saleData) => {
     try {
       return await SalesService.createSale(saleData);

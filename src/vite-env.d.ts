@@ -54,6 +54,8 @@ declare global {
 
       // === VENTAS ===
       getSales: () => Promise<any>;
+      /** NUEVO: definición para obtener solo ventas del día */
+      getSalesToday: () => Promise<any>;
       createSale: (saleData: any) => Promise<{ success: boolean }>;
       deleteSale: (id: number) => Promise<{ success: boolean }>;
       getDetallesByVenta: (ventaId: number) => Promise<any>;

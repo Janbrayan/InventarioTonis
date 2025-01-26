@@ -186,11 +186,16 @@ export default function Ventas() {
     fetchAll();
   }, []);
 
+  /**
+   * Ahora, en lugar de llamar a "getSales()", 
+   * llamamos a "getSalesToday()" para ver solo las ventas del día
+   */
   async function fetchAll() {
     try {
       setLoading(true);
       const [ventasList, prodList] = await Promise.all([
-        window.electronAPI.getSales(),
+        // solo cambiamos esta línea:
+        window.electronAPI.getSalesToday(),
         window.electronAPI.getProducts()
       ]);
       setVentas(ventasList || []);
@@ -219,6 +224,13 @@ export default function Ventas() {
 
     if (!newProdId) return; // si es 0 => no hay producto real
 
+    // Primero verificamos que no esté repetido
+    if (detalles.some((r) => r.productoId === newProdId)) {
+      alert('Este producto ya está agregado a la venta.');
+      setSelProductoId(0);
+      return;
+    }
+
     const prod = products.find((p) => p.id === newProdId);
     if (!prod) return;
 
@@ -231,7 +243,7 @@ export default function Ventas() {
     };
     setDetalles((prev) => [...prev, nuevo]);
 
-    // reseteamos el combo
+    // Reseteamos el combo
     setSelProductoId(0);
   }
 
@@ -243,14 +255,20 @@ export default function Ventas() {
   }
 
   // Cambiar cantidad o precio en un renglón
-  function handleChangeCantidad(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
+  function handleChangeCantidad(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    idx: number
+  ) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].cantidad = val;
     copy[idx].subtotal = copy[idx].precioUnitario * val;
     setDetalles(copy);
   }
-  function handleChangePrecio(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
+  function handleChangePrecio(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    idx: number
+  ) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].precioUnitario = val;
@@ -279,7 +297,6 @@ export default function Ventas() {
         const total = calcularTotal();
         // Construimos el objeto "venta" que enviamos al backend
         const saleData = {
-          // la fecha y observaciones se ponen por defecto en el backend
           total,
           detalles: detalles.map((d) => ({
             productoId: d.productoId,
@@ -376,6 +393,7 @@ export default function Ventas() {
           sx={{ backgroundColor: '#343a40', borderRadius: '8px 8px 0 0', pb: 1 }}
           action={
             <Button
+              type="button"
               variant="contained"
               color="success"
               startIcon={<AddIcon />}
@@ -457,7 +475,7 @@ export default function Ventas() {
         <DialogTitle sx={{ fontWeight: 'bold' }}>Crear Venta</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-            Selecciona un Producto para añadirlo (cantidad 1 por defecto):
+            Selecciona los Producto 
           </Typography>
           <FormControl fullWidth>
             <InputLabel id="select-product-label">Producto</InputLabel>
@@ -539,7 +557,7 @@ export default function Ventas() {
           {/* Calcular total, pago y cambio */}
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-              Total: ${total.toFixed(2)}
+              Total: ${calcularTotal().toFixed(2)}
             </Typography>
             <TextField
               label="Pago del cliente"

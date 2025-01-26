@@ -157,6 +157,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // === SALES (Ventas) ===
   getSales: () => ipcRenderer.invoke('get-sales'),
+  // (NUEVO) getSalesToday para ver solo ventas del día
+  getSalesToday: () => ipcRenderer.invoke('get-sales-today'),
   createSale: (saleData: FrontSale) => ipcRenderer.invoke('create-sale', saleData),
   deleteSale: (id: number) => ipcRenderer.invoke('delete-sale', id),
   getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),

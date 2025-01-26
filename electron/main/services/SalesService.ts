@@ -44,7 +44,7 @@ interface DBLoteRow {
  * Servicio de Ventas, con lógica FEFO (descontar lote con caducidad más próxima).
  */
 export class SalesService {
-  /** Listar Ventas (encabezado) */
+  /** Listar todas las ventas (encabezado). */
   static async getSales(): Promise<Sale[]> {
     try {
       const rows = db.prepare(`
@@ -64,6 +64,35 @@ export class SalesService {
       }));
     } catch (error) {
       console.error('Error getSales:', error);
+      return [];
+    }
+  }
+
+  /**
+   * (NUEVO) Listar solo las ventas **del día** (hora local).
+   * Filtra usando `substr(fecha,1,10) = date('now','localtime')`
+   * asumiendo `fecha` es tipo "YYYY-MM-DD HH:mm:ss".
+   */
+  static async getSalesToday(): Promise<Sale[]> {
+    try {
+      const rows = db.prepare(`
+        SELECT
+          id, fecha, total, observaciones,
+          createdAt, updatedAt
+        FROM sales
+        WHERE substr(fecha,1,10) = date('now','localtime')
+      `).all();
+
+      return rows.map((r: any) => ({
+        id: r.id,
+        fecha: r.fecha,
+        total: r.total,
+        observaciones: r.observaciones || undefined,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt
+      }));
+    } catch (error) {
+      console.error('Error getSalesToday:', error);
       return [];
     }
   }
