@@ -24,6 +24,7 @@ import {
   InputLabel
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // ====== Tipos locales ======
 interface Category {
@@ -87,6 +88,9 @@ function ConfirmDialog({
 //   Componente principal
 // ===============================
 export default function GestionProductos() {
+  const location = useLocation(); // Para leer location.state
+  const navigate = useNavigate();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,14 +134,35 @@ export default function GestionProductos() {
     }
   }
 
-  // Abrir modal para crear
-  function handleOpenCreate() {
+  // EFECTO PARA ABRIR MODAL AUTOMÁTICAMENTE SEGÚN location.state
+  useEffect(() => {
+    // Checa si location.state tiene algo como: { createBarcode: string } o { editBarcode: string }
+    const state: any = location.state;
+    if (state?.createBarcode) {
+      // QUIERO CREAR un producto con el código prellenado
+      handleOpenCreate(state.createBarcode);
+
+      // Limpio location.state para que no reabra al recargar
+      navigate(location.pathname, { replace: true });
+    } else if (state?.editBarcode) {
+      // QUIERO EDITAR un producto que ya existe
+      // Tendrías que buscarlo en 'products' o hacer un getProductByBarcode
+      const found = products.find(p => p.codigoBarras === state.editBarcode);
+      if (found) handleOpenEdit(found);
+
+      // Limpio location.state
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, products]);
+
+  // Abrir modal para crear (opcional: pasar un barcode ya)
+  function handleOpenCreate(barcode?: string) {
     setEditingProduct(null);
     setNombre('');
     setCategoriaId(null);
     setPrecioCompra(0);
     setPrecioVenta(0);
-    setCodigoBarras('');
+    setCodigoBarras(barcode ?? ''); // si viene barcode, lo pongo
     setActivo(true);
     setOpenModal(true);
   }
@@ -272,7 +297,7 @@ export default function GestionProductos() {
               color="success"
               startIcon={<AddIcon />}
               sx={{ fontWeight: 'bold', mr: 1 }}
-              onClick={handleOpenCreate}
+              onClick={() => handleOpenCreate()}
             >
               Crear Producto
             </Button>
@@ -286,7 +311,6 @@ export default function GestionProductos() {
                   <TableCell>ID</TableCell>
                   <TableCell>Nombre</TableCell>
                   <TableCell>Categoría</TableCell>
-                  {/* Con signo $ en la tabla */}
                   <TableCell>Compra ($)</TableCell>
                   <TableCell>Venta ($)</TableCell>
                   <TableCell>Código</TableCell>
@@ -312,7 +336,6 @@ export default function GestionProductos() {
                       <TableCell sx={{ color: '#fff' }}>{prod.id}</TableCell>
                       <TableCell sx={{ color: '#fff' }}>{prod.nombre}</TableCell>
                       <TableCell sx={{ color: '#fff' }}>{catName}</TableCell>
-                      {/* Muestra el signo de $ en la tabla */}
                       <TableCell sx={{ color: '#fff' }}>
                         {prod.precioCompra !== undefined ? `$${prod.precioCompra}` : '—'}
                       </TableCell>

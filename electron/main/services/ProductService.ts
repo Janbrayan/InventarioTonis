@@ -57,6 +57,39 @@ export class ProductService {
   }
 
   /**
+   * (NUEVO) Busca un producto por su código de barras.
+   */
+  static async getProductByBarcode(barcode: string): Promise<Product | null> {
+    try {
+      const row = db.prepare(`
+        SELECT
+          id, nombre, categoriaId, precioCompra, precioVenta,
+          codigoBarras, activo, createdAt, updatedAt
+        FROM products
+        WHERE codigoBarras = ?
+        LIMIT 1
+      `).get(barcode) as DBProduct | undefined;
+
+      if (!row) return null;
+
+      return {
+        id: row.id,
+        nombre: row.nombre,
+        categoriaId: row.categoriaId,
+        precioCompra: row.precioCompra,
+        precioVenta: row.precioVenta,
+        codigoBarras: row.codigoBarras ?? undefined,
+        activo: !!row.activo,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error getProductByBarcode:', error);
+      return null;
+    }
+  }
+
+  /**
    * Crea un nuevo producto.
    */
   static async createProduct(prod: Product): Promise<{ success: boolean }> {

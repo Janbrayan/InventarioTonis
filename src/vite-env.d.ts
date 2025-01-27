@@ -38,6 +38,8 @@ declare global {
       createProduct: (prodData: any) => Promise<{ success: boolean }>;
       updateProduct: (prodData: any) => Promise<{ success: boolean }>;
       deleteProduct: (id: number) => Promise<{ success: boolean }>;
+      /** NUEVO: Buscar producto por código de barras */
+      getProductByBarcode: (barcode: string) => Promise<any>;
 
       // === CRUD LOTES (INVENTARIO) ===
       getLotes: () => Promise<any>;
@@ -54,7 +56,6 @@ declare global {
 
       // === VENTAS ===
       getSales: () => Promise<any>;
-      /** NUEVO: definición para obtener solo ventas del día */
       getSalesToday: () => Promise<any>;
       createSale: (saleData: any) => Promise<{ success: boolean }>;
       deleteSale: (id: number) => Promise<{ success: boolean }>;
@@ -68,6 +69,7 @@ declare global {
       }) => Promise<{ success: boolean }>;
 
       // ========== ESTADÍSTICAS ==========
+
       // 1) Total de compras
       statsGetTotalComprasPorFecha: (
         fechaInicio?: string,
@@ -165,16 +167,9 @@ declare global {
       }>;
 
       // ========== HISTORIAL VENTAS (opcional) ==========
-      /** Trae todas las ventas */
       historialGetAllVentas?: () => Promise<any>;
-
-      /** Trae los detalles de una venta específica */
       historialGetDetallesByVentaId?: (ventaId: number) => Promise<any>;
-
-      /** Filtra ventas por rango (day, week, month, all) */
-      historialGetVentasByRange?: (
-        range: 'day' | 'week' | 'month' | 'all'
-      ) => Promise<any>;
-    };
+      historialGetVentasByRange?: (range: 'day' | 'week' | 'month' | 'all') => Promise<any>;
+    }
   }
 }

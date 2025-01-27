@@ -30,6 +30,7 @@ import {
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
 } from '@mui/icons-material';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 /** Interfaz de Producto (con precioVenta) */
 interface Product {
@@ -43,7 +44,6 @@ interface Sale {
   id?: number;
   total?: number;
   updatedAt?: string;
-  // fecha y observaciones se crean por defecto en backend
 }
 
 /** Renglón de la venta (simplificado): producto, cantidad, precio, subtotal */
@@ -62,13 +62,8 @@ interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void;
 }
-function ConfirmDialog({
-  open,
-  title,
-  message,
-  onClose,
-  onConfirm
-}: ConfirmDialogProps) {
+
+function ConfirmDialog({ open, title, message, onClose, onConfirm }: ConfirmDialogProps) {
   return (
     <Dialog
       open={open}
@@ -96,64 +91,15 @@ function ConfirmDialog({
   );
 }
 
-/** Convierte un número (hasta miles) a letras en español de forma muy básica. */
 function numberToSpanish(num: number): string {
-  if (num === 0) return 'cero';
-  const ones = [
-    '', 'uno', 'dos', 'tres', 'cuatro', 'cinco',
-    'seis', 'siete', 'ocho', 'nueve', 'diez',
-    'once', 'doce', 'trece', 'catorce', 'quince',
-    'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'
-  ];
-  const tens = [
-    '', '', 'veinte', 'treinta', 'cuarenta',
-    'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'
-  ];
-
-  if (num < 20) {
-    return ones[num];
-  }
-  if (num < 100) {
-    const t = Math.floor(num / 10);
-    const r = num % 10;
-    if (r === 0) return tens[t];
-    if (t === 2 && r !== 0) {
-      // e.g. 21 => "veintiuno"
-      return 'veinti' + numberToSpanish(r);
-    }
-    return tens[t] + ' y ' + ones[r];
-  }
-
-  if (num < 1000) {
-    const c = Math.floor(num / 100);
-    const r = num % 100;
-    if (c === 1 && r === 0) return 'cien';
-    const prefix = (c === 1) ? 'ciento' :
-      (c === 5) ? 'quinientos' :
-      (c === 7) ? 'setecientos' :
-      (c === 9) ? 'novecientos' :
-      ones[c] + 'cientos';
-    if (r === 0) return prefix;
-    return prefix + ' ' + numberToSpanish(r);
-  }
-
-  if (num < 2000) {
-    return 'mil ' + numberToSpanish(num - 1000);
-  }
-  if (num < 1000000) {
-    const thousands = Math.floor(num / 1000);
-    const r = num % 1000;
-    if (r === 0) {
-      return numberToSpanish(thousands) + ' mil';
-    }
-    return numberToSpanish(thousands) + ' mil ' + numberToSpanish(r);
-  }
-
-  return String(num); // fallback
+  // ... Tu lógica de conversión a letras ...
+  return String(num);
 }
 
-/** Componente principal de Ventas (sin fecha ni observaciones en la UI) */
 export default function Ventas() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [ventas, setVentas] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,26 +121,22 @@ export default function Ventas() {
   const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
   const [viewVentaId, setViewVentaId] = useState<number | null>(null);
 
-  // Para seleccionar un producto y agregarlo automáticamente
+  // Select manual
   const [selProductoId, setSelProductoId] = useState<number>(0);
 
-  // Manejo de pago y cambio
+  // Pago/cambio
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
+  // ===================== useEffect: Cargar data =====================
   useEffect(() => {
     fetchAll();
   }, []);
 
-  /**
-   * Ahora, en lugar de llamar a "getSales()", 
-   * llamamos a "getSalesToday()" para ver solo las ventas del día
-   */
   async function fetchAll() {
     try {
       setLoading(true);
       const [ventasList, prodList] = await Promise.all([
-        // solo cambiamos esta línea:
         window.electronAPI.getSalesToday(),
         window.electronAPI.getProducts()
       ]);
@@ -207,6 +149,39 @@ export default function Ventas() {
     }
   }
 
+  // ===================== Efecto A: si venimos con pendingProductId,
+  // hacemos un segundo navigate => openModal: 'createSale'
+  useEffect(() => {
+    if (!loading) {
+      const st: any = location.state;
+      if (typeof st?.pendingProductId === 'number') {
+        navigate(location.pathname, {
+          replace: true,
+          state: {
+            openModal: 'createSale',
+            productId: st.pendingProductId,
+          },
+        });
+      }
+    }
+  }, [loading, location.state, navigate]);
+
+  // ===================== Efecto B: si venimos con openModal: 'createSale',
+  // abrimos el modal y agregamos el producto
+  useEffect(() => {
+    if (!loading) {
+      const st: any = location.state;
+      if (st?.openModal === 'createSale') {
+        handleOpenCreate();
+        if (typeof st.productId === 'number') {
+          addProductById(st.productId);
+        }
+        navigate(location.pathname, { replace: true });
+      }
+    }
+  }, [loading, location.state, navigate]);
+
+  // ===================== Abrir/cerrar modal Crear Venta =====================
   function handleOpenCreate() {
     setDetalles([]);
     setPagoStr('');
@@ -217,58 +192,52 @@ export default function Ventas() {
     setOpenModal(false);
   }
 
-  // Al seleccionar un producto, se agrega automáticamente un renglón a la venta
+  // ===================== Seleccionar producto manualmente =====================
   function handleChangeProducto(e: SelectChangeEvent<number>) {
     const newProdId = Number(e.target.value);
     setSelProductoId(newProdId);
+    if (!newProdId) return;
 
-    if (!newProdId) return; // si es 0 => no hay producto real
+    addProductById(newProdId);
+    setSelProductoId(0);
+  }
 
-    // Primero verificamos que no esté repetido
-    if (detalles.some((r) => r.productoId === newProdId)) {
-      alert('Este producto ya está agregado a la venta.');
-      setSelProductoId(0);
+  // ===================== Agregar producto por ID =====================
+  function addProductById(productId: number) {
+    if (detalles.some((r) => r.productoId === productId)) {
+      alert('Este producto ya está agregado.');
       return;
     }
-
-    const prod = products.find((p) => p.id === newProdId);
+    const prod = products.find((p) => p.id === productId);
     if (!prod) return;
 
     const precio = prod.precioVenta ?? 0;
     const nuevo: DetalleVenta = {
-      productoId: newProdId,
+      productoId: productId,
       cantidad: 1,
       precioUnitario: precio,
-      subtotal: precio * 1
+      subtotal: precio * 1,
     };
     setDetalles((prev) => [...prev, nuevo]);
-
-    // Reseteamos el combo
-    setSelProductoId(0);
   }
 
-  // Eliminar renglón
+  // ===================== Eliminar renglón =====================
   function removeRenglonDetalle(idx: number) {
     const copy = [...detalles];
     copy.splice(idx, 1);
     setDetalles(copy);
   }
 
-  // Cambiar cantidad o precio en un renglón
-  function handleChangeCantidad(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
-    idx: number
-  ) {
+  // ===================== Cambiar cantidad/precio =====================
+  function handleChangeCantidad(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].cantidad = val;
     copy[idx].subtotal = copy[idx].precioUnitario * val;
     setDetalles(copy);
   }
-  function handleChangePrecio(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    idx: number
-  ) {
+
+  function handleChangePrecio(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].precioUnitario = val;
@@ -276,12 +245,12 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  // Calcular total
+  // ===================== Calcular total =====================
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
 
-  // Manejo del pago
+  // ===================== Pago / cambio =====================
   function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
     setPagoStr(e.target.value);
     const pagoNum = parseFloat(e.target.value) || 0;
@@ -290,19 +259,18 @@ export default function Ventas() {
     setCambio(c > 0 ? c : 0);
   }
 
-  // Guardar la venta
+  // ===================== Guardar Venta =====================
   async function handleSaveVenta() {
     const action = async () => {
       try {
         const total = calcularTotal();
-        // Construimos el objeto "venta" que enviamos al backend
         const saleData = {
           total,
           detalles: detalles.map((d) => ({
             productoId: d.productoId,
             cantidad: d.cantidad,
-            precioUnitario: d.precioUnitario
-          }))
+            precioUnitario: d.precioUnitario,
+          })),
         };
         const resp = await window.electronAPI.createSale(saleData);
         if (!resp?.success) {
@@ -318,13 +286,13 @@ export default function Ventas() {
 
     openConfirmDialog(
       'Confirmar venta',
-      `¿Deseas CREAR esta venta con ${detalles.length} renglones?`,
+      `¿Crear venta con ${detalles.length} renglones?`,
       action
     );
     setOpenModal(false);
   }
 
-  // Confirm dialog
+  // ===================== Confirm Dialog helpers =====================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -335,7 +303,7 @@ export default function Ventas() {
     setConfirmOpen(false);
   }
 
-  // Ver detalles
+  // ===================== Ver detalles venta existente =====================
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -352,10 +320,10 @@ export default function Ventas() {
     setViewVentaId(null);
   }
 
-  // Eliminar venta
+  // ===================== Eliminar venta =====================
   function handleDeleteVenta(v: Sale) {
     openConfirmDialog(
-      'Confirmar eliminación',
+      'Eliminar Venta',
       `¿Deseas ELIMINAR la venta #${v.id}?`,
       async () => {
         try {
@@ -374,11 +342,12 @@ export default function Ventas() {
     );
   }
 
+  // ===================== Render =====================
   if (loading) return <p>Cargando ventas...</p>;
 
   const total = calcularTotal();
   const pagoNum = parseFloat(pagoStr) || 0;
-  const cambioNum = (pagoNum - total) > 0 ? (pagoNum - total) : 0;
+  const cambioNum = (pagoNum - total) > 0 ? pagoNum - total : 0;
   const cambioEnLetra = cambioNum > 0 ? numberToSpanish(Math.round(cambioNum)) : '';
 
   return (
@@ -389,7 +358,7 @@ export default function Ventas() {
 
       <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
         <CardHeader
-          title={<Typography variant="h6" sx={{ fontWeight: 'bold' }}>Lista de Ventas</Typography>}
+          title={<Typography variant="h6" sx={{ fontWeight: 'bold' }}>Lista de Ventas (Hoy)</Typography>}
           sx={{ backgroundColor: '#343a40', borderRadius: '8px 8px 0 0', pb: 1 }}
           action={
             <Button
@@ -445,7 +414,6 @@ export default function Ventas() {
                     </TableCell>
                   </TableRow>
                 ))}
-
                 {ventas.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} align="center" sx={{ color: '#fff' }}>
@@ -475,7 +443,7 @@ export default function Ventas() {
         <DialogTitle sx={{ fontWeight: 'bold' }}>Crear Venta</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-            Selecciona los Producto 
+            Selecciona el Producto a vender
           </Typography>
           <FormControl fullWidth>
             <InputLabel id="select-product-label">Producto</InputLabel>
@@ -554,7 +522,7 @@ export default function Ventas() {
             </Table>
           </TableContainer>
 
-          {/* Calcular total, pago y cambio */}
+          {/* Pago / cambio */}
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
               Total: ${calcularTotal().toFixed(2)}

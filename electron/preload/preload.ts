@@ -138,6 +138,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateProduct: (prodData: FrontProduct & { id: number }) => ipcRenderer.invoke('update-product', prodData),
   deleteProduct: (id: number) => ipcRenderer.invoke('delete-product', id),
 
+  // (NUEVO) Buscar producto por código de barras
+  getProductByBarcode: (barcode: string) => ipcRenderer.invoke('get-product-by-barcode', barcode),
+
   // === PURCHASES ===
   getPurchases: () => ipcRenderer.invoke('get-purchases'),
   createPurchase: (purchaseData: FrontPurchase) => ipcRenderer.invoke('create-purchase', purchaseData),

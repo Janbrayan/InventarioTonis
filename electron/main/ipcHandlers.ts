@@ -8,8 +8,6 @@ import { PurchaseService } from './services/PurchaseService';
 import { LoteService } from './services/LoteService';
 import { SalesService } from './services/SalesService';
 import { StatsService } from './services/StatsService';
-
-// Importamos HistorialVentasService que filtra usando createdAt
 import { HistorialVentasService } from './services/HistorialVentasService';
 
 export function setupIpcHandlers() {
@@ -176,6 +174,16 @@ export function setupIpcHandlers() {
     } catch (error) {
       console.error('Error delete-product:', error);
       return { success: false };
+    }
+  });
+
+  // (NUEVO) Busqueda de producto por código de barras
+  ipcMain.handle('get-product-by-barcode', async (_event, barcode: string) => {
+    try {
+      return await ProductService.getProductByBarcode(barcode);
+    } catch (error) {
+      console.error('Error get-product-by-barcode:', error);
+      return null; // o { success: false } si prefieres
     }
   });
 
