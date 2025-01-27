@@ -46,7 +46,7 @@ interface Sale {
   updatedAt?: string;
 }
 
-/** Renglón de la venta (simplificado): producto, cantidad, precio, subtotal */
+/** Renglón de la venta */
 interface DetalleVenta {
   productoId: number;
   cantidad: number;
@@ -63,7 +63,13 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
-function ConfirmDialog({ open, title, message, onClose, onConfirm }: ConfirmDialogProps) {
+function ConfirmDialog({
+  open,
+  title,
+  message,
+  onClose,
+  onConfirm
+}: ConfirmDialogProps) {
   return (
     <Dialog
       open={open}
@@ -91,8 +97,8 @@ function ConfirmDialog({ open, title, message, onClose, onConfirm }: ConfirmDial
   );
 }
 
+/** Ejemplo mínimo para convertir números a texto */
 function numberToSpanish(num: number): string {
-  // ... Tu lógica de conversión a letras ...
   return String(num);
 }
 
@@ -121,7 +127,7 @@ export default function Ventas() {
   const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
   const [viewVentaId, setViewVentaId] = useState<number | null>(null);
 
-  // Select manual
+  // Selección manual de producto
   const [selProductoId, setSelProductoId] = useState<number>(0);
 
   // Pago/cambio
@@ -172,22 +178,31 @@ export default function Ventas() {
     if (!loading) {
       const st: any = location.state;
       if (st?.openModal === 'createSale') {
-        handleOpenCreate();
+        // (2) Solo abrimos el modal si aún no está abierto, para NO limpiar detalles
+        if (!openModal) {
+          handleOpenCreate(); 
+        }
         if (typeof st.productId === 'number') {
           addProductById(st.productId);
         }
+        // Limpiamos el state de la URL
         navigate(location.pathname, { replace: true });
       }
     }
-  }, [loading, location.state, navigate]);
+  }, [loading, location.state, navigate, openModal]);
 
   // ===================== Abrir/cerrar modal Crear Venta =====================
   function handleOpenCreate() {
-    setDetalles([]);
+    // (1) QUITAMOS setDetalles([]); para no limpiar cada vez que abrimos
+    // Solo si deseas que al dar click manualmente en "Crear Venta" se resetee, 
+    // podrías dejarlo, pero sabiendo que borrarás la venta anterior.
+    // setDetalles([]);
+
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
   }
+
   function handleCloseModal() {
     setOpenModal(false);
   }
@@ -203,22 +218,30 @@ export default function Ventas() {
   }
 
   // ===================== Agregar producto por ID =====================
+  // Sumar a la cantidad si ya existe
   function addProductById(productId: number) {
-    if (detalles.some((r) => r.productoId === productId)) {
-      alert('Este producto ya está agregado.');
-      return;
-    }
-    const prod = products.find((p) => p.id === productId);
-    if (!prod) return;
+    const index = detalles.findIndex((r) => r.productoId === productId);
 
-    const precio = prod.precioVenta ?? 0;
-    const nuevo: DetalleVenta = {
-      productoId: productId,
-      cantidad: 1,
-      precioUnitario: precio,
-      subtotal: precio * 1,
-    };
-    setDetalles((prev) => [...prev, nuevo]);
+    if (index >= 0) {
+      // Ya existe => incrementar la cantidad
+      const copy = [...detalles];
+      copy[index].cantidad += 1;
+      copy[index].subtotal = copy[index].cantidad * copy[index].precioUnitario;
+      setDetalles(copy);
+    } else {
+      // No existe => crear renglón
+      const prod = products.find((p) => p.id === productId);
+      if (!prod) return;
+
+      const precio = prod.precioVenta ?? 0;
+      const nuevo: DetalleVenta = {
+        productoId: productId,
+        cantidad: 1,
+        precioUnitario: precio,
+        subtotal: precio,
+      };
+      setDetalles((prev) => [...prev, nuevo]);
+    }
   }
 
   // ===================== Eliminar renglón =====================
@@ -233,7 +256,7 @@ export default function Ventas() {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].cantidad = val;
-    copy[idx].subtotal = copy[idx].precioUnitario * val;
+    copy[idx].subtotal = copy[idx].cantidad * copy[idx].precioUnitario;
     setDetalles(copy);
   }
 
@@ -245,12 +268,11 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  // ===================== Calcular total =====================
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
 
-  // ===================== Pago / cambio =====================
+  // ===================== Pago/cambio =====================
   function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
     setPagoStr(e.target.value);
     const pagoNum = parseFloat(e.target.value) || 0;
@@ -292,7 +314,7 @@ export default function Ventas() {
     setOpenModal(false);
   }
 
-  // ===================== Confirm Dialog helpers =====================
+  // ===================== Confirm Dialog =====================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -303,7 +325,7 @@ export default function Ventas() {
     setConfirmOpen(false);
   }
 
-  // ===================== Ver detalles venta existente =====================
+  // ===================== Ver Detalles =====================
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -554,7 +576,7 @@ export default function Ventas() {
         </DialogActions>
       </Dialog>
 
-      {/* Modal Ver Detalles de Venta */}
+      {/* Modal Ver Detalles */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}
