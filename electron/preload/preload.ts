@@ -140,7 +140,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createProduct: (prodData: FrontProduct) => ipcRenderer.invoke('create-product', prodData),
   updateProduct: (prodData: FrontProduct & { id: number }) => ipcRenderer.invoke('update-product', prodData),
   deleteProduct: (id: number) => ipcRenderer.invoke('delete-product', id),
-
   // (NUEVO) Buscar producto por código de barras
   getProductByBarcode: (barcode: string) => ipcRenderer.invoke('get-product-by-barcode', barcode),
 
@@ -156,10 +155,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createLote: (loteData: FrontLote) => ipcRenderer.invoke('create-lote', loteData),
   updateLote: (loteData: FrontLote & { id: number }) => ipcRenderer.invoke('update-lote', loteData),
   deleteLote: (id: number) => ipcRenderer.invoke('delete-lote', id),
-
-  // === Consumir lotes por merma / consumo interno
   descontarPorConsumo: (data: { loteId: number; cantidad: number; motivo?: string }) =>
     ipcRenderer.invoke('descontar-por-consumo', data),
+
+  // (NUEVO) Obtener inventario agrupado (productos + lotes + total)
+  getInventoryGrouped: () => ipcRenderer.invoke('get-inventory-grouped'),
 
   // === SALES (Ventas) ===
   getSales: () => ipcRenderer.invoke('get-sales'),
@@ -169,51 +169,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),
 
   // ========== ESTADÍSTICAS ==========
-  // 1) TotalComprasPorFecha
   statsGetTotalComprasPorFecha: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getTotalComprasPorFecha', fechaInicio, fechaFin),
-
-  // 2) ComprasPorProveedor
   statsGetComprasPorProveedor: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getComprasPorProveedor', fechaInicio, fechaFin),
-
-  // 3) TotalProductosActivos
   statsGetTotalProductosActivos: () =>
     ipcRenderer.invoke('stats-getTotalProductosActivos'),
-
-  // 4) InversionCompraPorProducto
   statsGetInversionCompraPorProducto: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getInversionCompraPorProducto', fechaInicio, fechaFin),
-
-  // 5) ValorTotalInventario
   statsGetValorTotalInventario: () =>
     ipcRenderer.invoke('stats-getValorTotalInventario'),
-
-  // 6) StockActualPorProducto
   statsGetStockActualPorProducto: () =>
     ipcRenderer.invoke('stats-getStockActualPorProducto'),
-
-  // 7) ProductosProximosACaducar
   statsGetProductosProximosACaducar: (dias: number) =>
     ipcRenderer.invoke('stats-getProductosProximosACaducar', dias),
-
-  // 8) ConsumosPorMotivo
   statsGetConsumosPorMotivo: () =>
     ipcRenderer.invoke('stats-getConsumosPorMotivo'),
-
-  // 9) CantidadTotalConsumos
   statsGetCantidadTotalConsumos: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getCantidadTotalConsumos', fechaInicio, fechaFin),
-
-  // 10) DistribucionProductosPorCategoria
   statsGetDistribucionProductosPorCategoria: () =>
     ipcRenderer.invoke('stats-getDistribucionProductosPorCategoria'),
-
-  // 11) NumCategoriasActivasInactivas
   statsGetNumCategoriasActivasInactivas: () =>
     ipcRenderer.invoke('stats-getNumCategoriasActivasInactivas'),
-
-  // 12) TotalPiezasInventario
   statsGetTotalPiezasInventario: () =>
     ipcRenderer.invoke('stats-getTotalPiezasInventario'),
 
@@ -221,37 +198,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   historialGetAllVentas: () => ipcRenderer.invoke('historial-getAllVentas'),
   historialGetDetallesByVentaId: (ventaId: number) =>
     ipcRenderer.invoke('historial-getDetallesByVentaId', ventaId),
-
-  // (NUEVO) Filtrar ventas por rango (day, week, month, all)
   historialGetVentasByRange: (range: 'day' | 'week' | 'month' | 'all') =>
     ipcRenderer.invoke('historial-getVentasByRange', range),
 
-  // ========== DASHBOARD (NUEVO) ==========
-  // 1) Métricas principales
+  // ========== DASHBOARD ==========
   dashboardGetMetrics: () => ipcRenderer.invoke('dashboard-getMetrics'),
-  // 2) Resumen de compras
   dashboardGetResumenCompras: () => ipcRenderer.invoke('dashboard-getResumenCompras'),
-  // 3) Top productos por precio
   dashboardGetTopProductosPorPrecio: (limit?: number) =>
     ipcRenderer.invoke('dashboard-getTopProductosPorPrecio', limit),
-
-  // (NUEVO) Agregamos el resto de métodos de DashboardService:
-  // 4) Margen de Ganancia (básico)
   dashboardGetMargenBasico: () => ipcRenderer.invoke('dashboard-getMargenBasico'),
-
-  // 5) Últimas Ventas
   dashboardGetUltimasVentas: (limit?: number) =>
     ipcRenderer.invoke('dashboard-getUltimasVentas', limit),
-
-  // 6) Últimas Compras
   dashboardGetUltimasCompras: (limit?: number) =>
     ipcRenderer.invoke('dashboard-getUltimasCompras', limit),
-
-  // 7) Productos con Bajo Stock
   dashboardGetProductosBajoStock: (threshold?: number, limit?: number) =>
     ipcRenderer.invoke('dashboard-getProductosBajoStock', threshold, limit),
-
-  // 8) Lotes Próximos a Vencer
   dashboardGetLotesProxVencimiento: (days?: number, limit?: number) =>
     ipcRenderer.invoke('dashboard-getLotesProxVencimiento', days, limit),
 });

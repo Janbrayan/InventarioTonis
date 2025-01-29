@@ -185,7 +185,7 @@ export function setupIpcHandlers() {
       return await ProductService.getProductByBarcode(barcode);
     } catch (error) {
       console.error('Error get-product-by-barcode:', error);
-      return null; // o { success: false } si prefieres
+      return null; // o { success: false } si lo prefieres
     }
   });
 
@@ -281,6 +281,16 @@ export function setupIpcHandlers() {
     } catch (error) {
       console.error('Error descontar-por-consumo IPC:', error);
       return { success: false };
+    }
+  });
+
+  // (NUEVO) Obtener inventario agrupado (productos + lotes + total)
+  ipcMain.handle('get-inventory-grouped', async () => {
+    try {
+      return await LoteService.getInventoryGrouped();
+    } catch (error) {
+      console.error('Error get-inventory-grouped:', error);
+      return [];
     }
   });
 
@@ -482,7 +492,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (c) Filtrar ventas por range (day, week, month, all) usando createdAt
+  // (c) Filtrar ventas por rango (day, week, month, all)
   ipcMain.handle(
     'historial-getVentasByRange',
     async (_event, range: 'day' | 'week' | 'month' | 'all') => {
@@ -496,7 +506,6 @@ export function setupIpcHandlers() {
   );
 
   // ========== DASHBOARD (NUEVO) ==========
-
   // 1) Obtener métricas principales
   ipcMain.handle('dashboard-getMetrics', async () => {
     try {
@@ -526,8 +535,6 @@ export function setupIpcHandlers() {
       return [];
     }
   });
-
-  // (NUEVOS Métodos) =========================
 
   // 4) Margen de Ganancia (Básico)
   ipcMain.handle('dashboard-getMargenBasico', async () => {

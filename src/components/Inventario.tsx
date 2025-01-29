@@ -33,12 +33,24 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
 } from '@mui/icons-material';
 
-/** Tipos básicos */
+/** Estructura devuelta por getInventoryGrouped() */
+interface InventoryGroup {
+  product: {
+    id: number;
+    nombre: string;
+  };
+  lotes: Lote[];
+  totalLotes: number;
+  totalPiezas: number;
+}
+
+/** Producto básico para el <Select> */
 interface Product {
   id: number;
   nombre: string;
 }
 
+/** Lote según lo manejes en tu backend */
 interface Lote {
   id?: number;
   productoId: number;
@@ -95,7 +107,9 @@ function ConfirmDialog({
  * Ajusta los límites a tu gusto (por ejemplo <5, <15, etc.).
  */
 function getStockStatus(totalPiezas: number) {
-  if (totalPiezas < 5) {
+  if (totalPiezas === 0) {
+    return { label: 'Sin stock', color: 'red' };
+  } else if (totalPiezas < 5) {
     return { label: 'Poco stock', color: 'red' };
   } else if (totalPiezas < 15) {
     return { label: 'Stock normal', color: 'orange' };
@@ -104,10 +118,14 @@ function getStockStatus(totalPiezas: number) {
   }
 }
 
+
 /** Componente principal */
 export default function Inventario() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [lotes, setLotes] = useState<Lote[]>([]);
+  // Lista agrupada proveniente del backend
+  const [inventory, setInventory] = useState<InventoryGroup[]>([]);
+  // Lista completa de productos para el <Select>
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+
   const [loading, setLoading] = useState(true);
 
   // =========================
@@ -153,12 +171,15 @@ export default function Inventario() {
   async function fetchData() {
     try {
       setLoading(true);
-      const [prodList, lotList] = await Promise.all([
+      // 1) Obtenemos inventario agrupado
+      // 2) Obtenemos la lista completa de productos
+      const [inv, prodList] = await Promise.all([
+        window.electronAPI.getInventoryGrouped(),
         window.electronAPI.getProducts(),
-        window.electronAPI.getLotes(),
       ]);
-      setProducts(prodList || []);
-      setLotes(lotList || []);
+
+      setInventory(inv || []);
+      setAllProducts(prodList || []);
     } catch (err) {
       console.error('Error fetchData Inventario:', err);
     } finally {
@@ -167,31 +188,7 @@ export default function Inventario() {
   }
 
   // =========================
-  //   Agrupación de lotes por producto
-  // =========================
-  const grouped = products.map((prod) => {
-    const lotesDeEsteProd = lotes.filter(
-      (l) => l.productoId === prod.id && l.activo !== false
-    );
-    const totalLotes = lotesDeEsteProd.length;
-    const totalPiezas = lotesDeEsteProd.reduce(
-      (acc, lote) => acc + (lote.cantidadActual ?? 0),
-      0
-    );
-    return {
-      product: prod,
-      lotes: lotesDeEsteProd,
-      totalLotes,
-      totalPiezas,
-    };
-  });
-
-  function toggleProductRow(prodId: number) {
-    setOpenProductId((prev) => (prev === prodId ? null : prodId));
-  }
-
-  // =========================
-  //     Crear / Editar
+  //     Crear / Editar Lote
   // =========================
   function handleOpenCreate() {
     setEditingLote(null);
@@ -201,6 +198,7 @@ export default function Inventario() {
     setCantidadActual(0);
     setOpenModal(true);
   }
+
   function handleOpenEdit(l: Lote) {
     setEditingLote(l);
     setProductoId(l.productoId);
@@ -209,6 +207,7 @@ export default function Inventario() {
     setCantidadActual(l.cantidadActual ?? 0);
     setOpenModal(true);
   }
+
   function handleCloseModal() {
     setOpenModal(false);
     setEditingLote(null);
@@ -302,12 +301,14 @@ export default function Inventario() {
     setDescuentoMotivo('');
     setDescuentoOpen(true);
   }
+
   function handleCloseDescuento() {
     setDescuentoOpen(false);
     setDescuentoLote(null);
     setDescuentoCantidad('');
     setDescuentoMotivo('');
   }
+
   async function handleConfirmDescuento() {
     if (!descuentoLote) return;
     const cant = parseFloat(descuentoCantidad) || 0;
@@ -349,15 +350,23 @@ export default function Inventario() {
     setConfirmAction(() => action);
     setConfirmOpen(true);
   }
+
   function closeConfirmDialog() {
     setConfirmOpen(false);
+  }
+
+  // =========================
+  //  Expandir / Colapsar filas
+  // =========================
+  function toggleProductRow(prodId: number) {
+    setOpenProductId((prev) => (prev === prodId ? null : prodId));
   }
 
   // =========================
   //     RENDER
   // =========================
   if (loading) {
-    return <p>Cargando inventario (Productos)...</p>;
+    return <p>Cargando inventario (agrupado)...</p>;
   }
 
   return (
@@ -424,7 +433,7 @@ export default function Inventario() {
               </TableHead>
 
               <TableBody>
-                {grouped.map(({ product, lotes: lotesDeEsteProd, totalLotes, totalPiezas }) => {
+                {inventory.map(({ product, lotes, totalLotes, totalPiezas }) => {
                   const isOpen = openProductId === product.id;
                   const infoExtra = `(${totalLotes} lotes, ${totalPiezas} piezas)`;
 
@@ -502,7 +511,7 @@ export default function Inventario() {
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                  {lotesDeEsteProd.length === 0 ? (
+                                  {lotes.length === 0 ? (
                                     <TableRow>
                                       <TableCell
                                         colSpan={6}
@@ -513,13 +522,12 @@ export default function Inventario() {
                                       </TableCell>
                                     </TableRow>
                                   ) : (
-                                    lotesDeEsteProd.map((l) => (
+                                    lotes.map((l) => (
                                       <TableRow
                                         key={l.id}
                                         sx={{
                                           '&:hover': {
-                                            backgroundColor:
-                                              'rgba(255,255,255,0.05)',
+                                            backgroundColor: 'rgba(255,255,255,0.05)',
                                           },
                                         }}
                                       >
@@ -550,7 +558,7 @@ export default function Inventario() {
                                             sx={{ mr: 1, fontWeight: 'bold' }}
                                             startIcon={<EditIcon />}
                                             onClick={(e) => {
-                                              e.stopPropagation(); 
+                                              e.stopPropagation();
                                               handleOpenEdit(l);
                                             }}
                                           >
@@ -596,8 +604,8 @@ export default function Inventario() {
                   );
                 })}
 
-                {/* Si no hay productos en absoluto */}
-                {grouped.length === 0 && (
+                {/* Si no hay nada en inventory en absoluto */}
+                {inventory.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={3} align="center" sx={{ color: '#fff' }}>
                       No hay productos registrados
@@ -635,7 +643,7 @@ export default function Inventario() {
               onChange={(e) => setProductoId(Number(e.target.value))}
             >
               <MenuItem value={0}>-- Seleccionar --</MenuItem>
-              {products.map((p) => (
+              {allProducts.map((p) => (
                 <MenuItem key={p.id} value={p.id}>
                   {p.nombre}
                 </MenuItem>

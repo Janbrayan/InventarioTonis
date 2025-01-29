@@ -46,6 +46,9 @@ declare global {
       updateLote: (loteData: any) => Promise<{ success: boolean }>;
       deleteLote: (id: number) => Promise<{ success: boolean }>;
 
+      /** NUEVO: Obtener inventario agrupado (productos + lotes + totales) */
+      getInventoryGrouped: () => Promise<any>;
+
       // === COMPRAS ===
       getPurchases: () => Promise<any>;
       createPurchase: (purchaseData: any) => Promise<{ success: boolean }>;
