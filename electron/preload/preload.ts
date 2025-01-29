@@ -107,7 +107,10 @@ export interface FrontDetalleVenta {
   piezasVendidas?: number;
 }
 
-// Exponemos las funciones de IPC en `window.electronAPI`
+// =========================
+//  Exponemos las funciones
+//  de IPC en `window.electronAPI`
+// =========================
 contextBridge.exposeInMainWorld('electronAPI', {
   // === LOGIN ===
   loginUser: async (username: string, password: string): Promise<LoginUserResponse> => {
@@ -166,7 +169,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDetallesByVenta: (ventaId: number) => ipcRenderer.invoke('get-detalles-by-venta', ventaId),
 
   // ========== ESTADÍSTICAS ==========
-
   // 1) TotalComprasPorFecha
   statsGetTotalComprasPorFecha: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('stats-getTotalComprasPorFecha', fechaInicio, fechaFin),
@@ -223,4 +225,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // (NUEVO) Filtrar ventas por rango (day, week, month, all)
   historialGetVentasByRange: (range: 'day' | 'week' | 'month' | 'all') =>
     ipcRenderer.invoke('historial-getVentasByRange', range),
+
+  // ========== DASHBOARD (NUEVO) ==========
+  // 1) Métricas principales
+  dashboardGetMetrics: () => ipcRenderer.invoke('dashboard-getMetrics'),
+  // 2) Resumen de compras
+  dashboardGetResumenCompras: () => ipcRenderer.invoke('dashboard-getResumenCompras'),
+  // 3) Top productos por precio
+  dashboardGetTopProductosPorPrecio: (limit?: number) =>
+    ipcRenderer.invoke('dashboard-getTopProductosPorPrecio', limit),
+
+  // (NUEVO) Agregamos el resto de métodos de DashboardService:
+  // 4) Margen de Ganancia (básico)
+  dashboardGetMargenBasico: () => ipcRenderer.invoke('dashboard-getMargenBasico'),
+
+  // 5) Últimas Ventas
+  dashboardGetUltimasVentas: (limit?: number) =>
+    ipcRenderer.invoke('dashboard-getUltimasVentas', limit),
+
+  // 6) Últimas Compras
+  dashboardGetUltimasCompras: (limit?: number) =>
+    ipcRenderer.invoke('dashboard-getUltimasCompras', limit),
+
+  // 7) Productos con Bajo Stock
+  dashboardGetProductosBajoStock: (threshold?: number, limit?: number) =>
+    ipcRenderer.invoke('dashboard-getProductosBajoStock', threshold, limit),
+
+  // 8) Lotes Próximos a Vencer
+  dashboardGetLotesProxVencimiento: (days?: number, limit?: number) =>
+    ipcRenderer.invoke('dashboard-getLotesProxVencimiento', days, limit),
 });

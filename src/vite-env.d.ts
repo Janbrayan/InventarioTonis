@@ -1,4 +1,3 @@
-// global.d.ts
 export {};
 
 declare global {
@@ -169,7 +168,96 @@ declare global {
       // ========== HISTORIAL VENTAS (opcional) ==========
       historialGetAllVentas?: () => Promise<any>;
       historialGetDetallesByVentaId?: (ventaId: number) => Promise<any>;
-      historialGetVentasByRange?: (range: 'day' | 'week' | 'month' | 'all') => Promise<any>;
+      historialGetVentasByRange?: (
+        range: 'day' | 'week' | 'month' | 'all'
+      ) => Promise<any>;
+
+      // ========== DASHBOARD ==========
+      /** Obtiene métricas principales (totalProductos, totalVentas, etc.) */
+      dashboardGetMetrics: () => Promise<{
+        totalProductos: number;
+        totalProveedores: number;
+        totalVentas: number;
+        totalVentasDinero: number;
+        ultimaVenta?: string;
+      }>;
+
+      /** Resumen de compras (totalCompras, etc.) */
+      dashboardGetResumenCompras: () => Promise<{
+        totalCompras: number;
+        totalComprasDinero: number;
+        ultimaCompra?: string;
+      }>;
+
+      /** Top productos por precio (limit opcional) */
+      dashboardGetTopProductosPorPrecio: (
+        limit?: number
+      ) => Promise<
+        Array<{
+          id: number;
+          nombre: string;
+          precioVenta: number;
+        }>
+      >;
+
+      /** Margen de Ganancia (básico) */
+      dashboardGetMargenBasico?: () => Promise<number>;
+
+      /** Últimas Ventas */
+      dashboardGetUltimasVentas?: (
+        limit?: number
+      ) => Promise<
+        Array<{
+          id: number;
+          fecha: string;
+          total: number;
+          createdAt: string;
+          updatedAt: string;
+        }>
+      >;
+
+      /** Últimas Compras */
+      dashboardGetUltimasCompras?: (
+        limit?: number
+      ) => Promise<
+        Array<{
+          id: number;
+          proveedorId: number;
+          fecha: string;
+          total: number;
+          createdAt: string;
+          updatedAt: string;
+        }>
+      >;
+
+      /** Productos con Bajo Stock */
+      dashboardGetProductosBajoStock?: (
+        threshold?: number,
+        limit?: number
+      ) => Promise<
+        Array<{
+          id: number;
+          nombre: string;
+          stock: number;
+        }>
+      >;
+
+      /** Lotes Próximos a Vencer */
+      dashboardGetLotesProxVencimiento?: (
+        days?: number,
+        limit?: number
+      ) => Promise<
+        Array<{
+          id: number;
+          productoId: number;
+          lote: string;
+          fechaCaducidad: string;
+          cantidadActual: number;
+          activo: number;
+          createdAt: string;
+          updatedAt: string;
+        }>
+      >;
     }
   }
 }

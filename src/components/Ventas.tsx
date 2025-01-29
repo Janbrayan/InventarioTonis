@@ -46,7 +46,7 @@ interface Sale {
   updatedAt?: string;
 }
 
-/** Renglón de la venta */
+/** Renglón de la venta (simplificado) */
 interface DetalleVenta {
   productoId: number;
   cantidad: number;
@@ -97,8 +97,114 @@ function ConfirmDialog({
   );
 }
 
-/** Ejemplo mínimo para convertir números a texto */
+/**
+ * Convierte un número (hasta cientos de miles) a letras en español,
+ * evitando "cero" al final en centenas exactas (200, 300, etc.).
+ */
 function numberToSpanish(num: number): string {
+  if (num === 0) return 'cero';
+
+  const ones = [
+    '', 'uno', 'dos', 'tres', 'cuatro', 'cinco',
+    'seis', 'siete', 'ocho', 'nueve', 'diez',
+    'once', 'doce', 'trece', 'catorce', 'quince',
+    'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'
+  ];
+  const tens = [
+    '', '', 'veinte', 'treinta', 'cuarenta',
+    'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'
+  ];
+
+  // 0..19
+  if (num < 20) {
+    return ones[num];
+  }
+
+  // 20..99
+  if (num < 100) {
+    const t = Math.floor(num / 10);
+    const r = num % 10;
+    if (r === 0) {
+      return tens[t]; // 20 => 'veinte', 30 => 'treinta', etc.
+    }
+    if (t === 2) {
+      // 21..29 => 'veintiuno', etc.
+      return 'veinti' + numberToSpanish(r);
+    }
+    return tens[t] + ' y ' + ones[r];
+  }
+
+  // 100..199
+  if (num < 200) {
+    if (num === 100) return 'cien';
+    return 'ciento ' + numberToSpanish(num - 100);
+  }
+
+  // 200..299
+  if (num < 300) {
+    if (num === 200) return 'doscientos';
+    return 'doscientos ' + numberToSpanish(num - 200);
+  }
+
+  // 300..399
+  if (num < 400) {
+    if (num === 300) return 'trescientos';
+    return 'trescientos ' + numberToSpanish(num - 300);
+  }
+
+  // 400..499
+  if (num < 500) {
+    if (num === 400) return 'cuatrocientos';
+    return 'cuatrocientos ' + numberToSpanish(num - 400);
+  }
+
+  // 500..599
+  if (num < 600) {
+    if (num === 500) return 'quinientos';
+    return 'quinientos ' + numberToSpanish(num - 500);
+  }
+
+  // 600..699
+  if (num < 700) {
+    if (num === 600) return 'seiscientos';
+    return 'seiscientos ' + numberToSpanish(num - 600);
+  }
+
+  // 700..799
+  if (num < 800) {
+    if (num === 700) return 'setecientos';
+    return 'setecientos ' + numberToSpanish(num - 700);
+  }
+
+  // 800..899
+  if (num < 900) {
+    if (num === 800) return 'ochocientos';
+    return 'ochocientos ' + numberToSpanish(num - 800);
+  }
+
+  // 900..999
+  if (num < 1000) {
+    if (num === 900) return 'novecientos';
+    return 'novecientos ' + numberToSpanish(num - 900);
+  }
+
+  // 1000..1999
+  if (num < 2000) {
+    if (num === 1000) return 'mil';
+    return 'mil ' + numberToSpanish(num - 1000);
+  }
+
+  // 2000..999999
+  if (num < 1000000) {
+    const thousands = Math.floor(num / 1000);
+    const remainder = num % 1000;
+    if (remainder === 0) {
+      return numberToSpanish(thousands) + ' mil';
+    }
+    return numberToSpanish(thousands) + ' mil ' + numberToSpanish(remainder);
+  }
+
+  // >= 1,000,000 (no manejado completamente en este ejemplo)
   return String(num);
 }
 
@@ -134,7 +240,7 @@ export default function Ventas() {
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
-  // ===================== useEffect: Cargar data =====================
+  // ===================== Cargar data (ventas, productos) =====================
   useEffect(() => {
     fetchAll();
   }, []);
@@ -155,8 +261,7 @@ export default function Ventas() {
     }
   }
 
-  // ===================== Efecto A: si venimos con pendingProductId,
-  // hacemos un segundo navigate => openModal: 'createSale'
+  // ===================== Efecto A: pendingProductId => openModal: 'createSale' =====================
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -172,20 +277,17 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate]);
 
-  // ===================== Efecto B: si venimos con openModal: 'createSale',
-  // abrimos el modal y agregamos el producto
+  // ===================== Efecto B: openModal: 'createSale' => Abrir modal y agregar producto
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
       if (st?.openModal === 'createSale') {
-        // (2) Solo abrimos el modal si aún no está abierto, para NO limpiar detalles
         if (!openModal) {
-          handleOpenCreate(); 
+          handleOpenCreate();
         }
         if (typeof st.productId === 'number') {
           addProductById(st.productId);
         }
-        // Limpiamos el state de la URL
         navigate(location.pathname, { replace: true });
       }
     }
@@ -193,9 +295,7 @@ export default function Ventas() {
 
   // ===================== Abrir/cerrar modal Crear Venta =====================
   function handleOpenCreate() {
-    // (1) QUITAMOS setDetalles([]); para no limpiar cada vez que abrimos
-    // Solo si deseas que al dar click manualmente en "Crear Venta" se resetee, 
-    // podrías dejarlo, pero sabiendo que borrarás la venta anterior.
+    // Si quieres limpiar la venta al clickar manualmente "Crear Venta":
     // setDetalles([]);
 
     setPagoStr('');
@@ -217,8 +317,7 @@ export default function Ventas() {
     setSelProductoId(0);
   }
 
-  // ===================== Agregar producto por ID =====================
-  // Sumar a la cantidad si ya existe
+  // ===================== Agregar producto =====================
   function addProductById(productId: number) {
     const index = detalles.findIndex((r) => r.productoId === productId);
 
@@ -229,7 +328,7 @@ export default function Ventas() {
       copy[index].subtotal = copy[index].cantidad * copy[index].precioUnitario;
       setDetalles(copy);
     } else {
-      // No existe => crear renglón
+      // No existe => crear renglón nuevo
       const prod = products.find((p) => p.id === productId);
       if (!prod) return;
 
@@ -238,7 +337,7 @@ export default function Ventas() {
         productoId: productId,
         cantidad: 1,
         precioUnitario: precio,
-        subtotal: precio,
+        subtotal: precio
       };
       setDetalles((prev) => [...prev, nuevo]);
     }
@@ -268,6 +367,7 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
+  // ===================== Calcular total =====================
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
@@ -325,7 +425,7 @@ export default function Ventas() {
     setConfirmOpen(false);
   }
 
-  // ===================== Ver Detalles =====================
+  // ===================== Ver Detalles de Venta existente =====================
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -336,6 +436,7 @@ export default function Ventas() {
       console.error('Error getDetallesByVenta:', err);
     }
   }
+
   function handleCloseDetalles() {
     setOpenDetalles(false);
     setDetallesVenta([]);
@@ -367,10 +468,17 @@ export default function Ventas() {
   // ===================== Render =====================
   if (loading) return <p>Cargando ventas...</p>;
 
+  // Calcular total y cambio
   const total = calcularTotal();
   const pagoNum = parseFloat(pagoStr) || 0;
-  const cambioNum = (pagoNum - total) > 0 ? pagoNum - total : 0;
-  const cambioEnLetra = cambioNum > 0 ? numberToSpanish(Math.round(cambioNum)) : '';
+  const cambioNum = pagoNum > total ? (pagoNum - total) : 0;
+
+  // Convertimos el cambio a entero
+  const cambioInt = Math.round(cambioNum);
+  // Cambiamos a letras
+  const cambioEnLetra = cambioInt > 0
+    ? numberToSpanish(cambioInt) + (cambioInt === 1 ? ' peso' : ' pesos')
+    : '';
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -547,7 +655,7 @@ export default function Ventas() {
           {/* Pago / cambio */}
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-              Total: ${calcularTotal().toFixed(2)}
+              Total: ${total.toFixed(2)}
             </Typography>
             <TextField
               label="Pago del cliente"
@@ -576,7 +684,7 @@ export default function Ventas() {
         </DialogActions>
       </Dialog>
 
-      {/* Modal Ver Detalles */}
+      {/* Modal Ver Detalles de Venta */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}

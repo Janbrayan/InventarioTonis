@@ -9,6 +9,8 @@ import { LoteService } from './services/LoteService';
 import { SalesService } from './services/SalesService';
 import { StatsService } from './services/StatsService';
 import { HistorialVentasService } from './services/HistorialVentasService';
+// (NUEVO) Importa tu dashboardService:
+import { dashboardService } from './services/dashboardService';
 
 export function setupIpcHandlers() {
   // ========== LOGIN ==========
@@ -460,7 +462,6 @@ export function setupIpcHandlers() {
   });
 
   // ========== HISTORIAL DE VENTAS ==========
-
   // (a) Traer TODAS las ventas
   ipcMain.handle('historial-getAllVentas', async () => {
     try {
@@ -489,6 +490,96 @@ export function setupIpcHandlers() {
         return await HistorialVentasService.getVentasByRange(range);
       } catch (error) {
         console.error('Error historial-getVentasByRange:', error);
+        return [];
+      }
+    }
+  );
+
+  // ========== DASHBOARD (NUEVO) ==========
+
+  // 1) Obtener métricas principales
+  ipcMain.handle('dashboard-getMetrics', async () => {
+    try {
+      return dashboardService.getMetrics();
+    } catch (error) {
+      console.error('Error dashboard-getMetrics:', error);
+      return null;
+    }
+  });
+
+  // 2) Obtener resumen de compras
+  ipcMain.handle('dashboard-getResumenCompras', async () => {
+    try {
+      return dashboardService.getResumenCompras();
+    } catch (error) {
+      console.error('Error dashboard-getResumenCompras:', error);
+      return null;
+    }
+  });
+
+  // 3) Top productos por precio
+  ipcMain.handle('dashboard-getTopProductosPorPrecio', async (_event, limit?: number) => {
+    try {
+      return dashboardService.getTopProductosPorPrecio(limit || 5);
+    } catch (error) {
+      console.error('Error dashboard-getTopProductosPorPrecio:', error);
+      return [];
+    }
+  });
+
+  // (NUEVOS Métodos) =========================
+
+  // 4) Margen de Ganancia (Básico)
+  ipcMain.handle('dashboard-getMargenBasico', async () => {
+    try {
+      return dashboardService.getMargenBasico();
+    } catch (error) {
+      console.error('Error dashboard-getMargenBasico:', error);
+      return 0;
+    }
+  });
+
+  // 5) Últimas Ventas
+  ipcMain.handle('dashboard-getUltimasVentas', async (_event, limit?: number) => {
+    try {
+      return dashboardService.getUltimasVentas(limit || 5);
+    } catch (error) {
+      console.error('Error dashboard-getUltimasVentas:', error);
+      return [];
+    }
+  });
+
+  // 6) Últimas Compras
+  ipcMain.handle('dashboard-getUltimasCompras', async (_event, limit?: number) => {
+    try {
+      return dashboardService.getUltimasCompras(limit || 5);
+    } catch (error) {
+      console.error('Error dashboard-getUltimasCompras:', error);
+      return [];
+    }
+  });
+
+  // 7) Productos con Bajo Stock
+  ipcMain.handle(
+    'dashboard-getProductosBajoStock',
+    async (_event, threshold?: number, limit?: number) => {
+      try {
+        return dashboardService.getProductosBajoStock(threshold || 5, limit || 10);
+      } catch (error) {
+        console.error('Error dashboard-getProductosBajoStock:', error);
+        return [];
+      }
+    }
+  );
+
+  // 8) Lotes Próximos a Vencer
+  ipcMain.handle(
+    'dashboard-getLotesProxVencimiento',
+    async (_event, days?: number, limit?: number) => {
+      try {
+        return dashboardService.getLotesProxVencimiento(days || 30, limit || 10);
+      } catch (error) {
+        console.error('Error dashboard-getLotesProxVencimiento:', error);
         return [];
       }
     }

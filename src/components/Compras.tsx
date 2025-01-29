@@ -103,8 +103,6 @@ interface DetalleModalProps {
   onClose: () => void;
   onSave: (detalle: DetalleCompra) => void;
   products: Product[];
-
-  /** (NUEVO) si quieres preseleccionar un producto en el submodal */
   preselectedProductId?: number | null;
 }
 function DetalleModal({
@@ -114,50 +112,62 @@ function DetalleModal({
   products,
   preselectedProductId,
 }: DetalleModalProps) {
+  // Usamos strings en los campos numéricos para permitir borrar '0' y quedar en blanco
   const [productoId, setProductoId] = useState<number>(0);
-  const [cantidad, setCantidad] = useState<number>(1);
-  const [precioUnit, setPrecioUnit] = useState<number>(0);
+
+  const [cantidadStr, setCantidadStr] = useState<string>('1');
+  const [precioUnitStr, setPrecioUnitStr] = useState<string>('0');
   const [tipoCont, setTipoCont] = useState<'unidad' | 'caja' | 'paquete'>('unidad');
-  const [upc, setUpc] = useState<number>(1);
+  const [upcStr, setUpcStr] = useState<string>('1');
+
   const [lote, setLote] = useState('');
   const [caducidad, setCaducidad] = useState('');
-  const [precioVenta, setPrecioVenta] = useState<number>(0);
+  const [precioVentaStr, setPrecioVentaStr] = useState<string>('0');
 
   function handleConfirm() {
-    if (!productoId) {
-      alert('Selecciona un producto.');
+    // 1) Verificar producto
+    if (!productoId || productoId <= 0) {
+      alert('Selecciona un producto válido.');
       return;
     }
-    if (cantidad <= 0 || precioUnit <= 0) {
+    // 2) Convertir strings a número
+    const c = parseFloat(cantidadStr) || 0;
+    const pu = parseFloat(precioUnitStr) || 0;
+    const pv = parseFloat(precioVentaStr) || 0;
+    const upc = parseFloat(upcStr) || 1;
+
+    // 3) Validar > 0
+    if (c <= 0 || pu <= 0) {
       alert('Cantidad y precio deben ser mayores a 0.');
       return;
     }
+
+    // 4) Crear detalle
     const detalle: DetalleCompra = {
       productoId,
-      cantidad,
-      precioUnitario: precioUnit,
+      cantidad: c,
+      precioUnitario: pu,
       tipoContenedor: tipoCont,
       unidadesPorContenedor: tipoCont !== 'unidad' ? upc : 1,
       lote: lote || undefined,
       fechaCaducidad: caducidad || undefined,
-      precioVenta: precioVenta || undefined,
+      precioVenta: pv || undefined,
     };
     onSave(detalle);
     onClose();
   }
 
-  // Resetear campos al abrir el submodal
-  useEffect(() => {
+  // Resetear al abrir
+  React.useEffect(() => {
     if (open) {
-      setCantidad(1);
-      setPrecioUnit(0);
+      setCantidadStr('1');
+      setPrecioUnitStr('0');
       setTipoCont('unidad');
-      setUpc(1);
+      setUpcStr('1');
       setLote('');
       setCaducidad('');
-      setPrecioVenta(0);
+      setPrecioVentaStr('0');
 
-      // (NUEVO) si llega preselectedProductId, lo fijamos:
       if (preselectedProductId) {
         setProductoId(preselectedProductId);
       } else {
@@ -167,9 +177,13 @@ function DetalleModal({
   }, [open, preselectedProductId]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" BackdropProps={{
-      style: { backdropFilter: 'blur(6px)' }
-    }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
       <DialogTitle sx={{ fontWeight: 'bold' }}>Agregar Producto</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
         <FormControl fullWidth>
@@ -180,7 +194,9 @@ function DetalleModal({
             label="Producto"
             onChange={(e) => setProductoId(Number(e.target.value))}
           >
-            <MenuItem value="">-- Seleccionar --</MenuItem>
+            <MenuItem value={0} disabled>
+              -- Seleccionar --
+            </MenuItem>
             {products.map((p) => (
               <MenuItem key={p.id} value={p.id}>
                 {p.nombre}
@@ -189,17 +205,24 @@ function DetalleModal({
           </Select>
         </FormControl>
 
+        {/* Campos numéricos con string */}
         <TextField
           label="Cantidad"
-          type="number"
-          value={cantidad}
-          onChange={(e) => setCantidad(Number(e.target.value))}
+          type="text"
+          value={cantidadStr}
+          onChange={(e) => {
+            const val = e.target.value.replace(/[^\d.]/g, '');
+            setCantidadStr(val);
+          }}
         />
         <TextField
           label="Precio Unitario"
-          type="number"
-          value={precioUnit}
-          onChange={(e) => setPrecioUnit(Number(e.target.value))}
+          type="text"
+          value={precioUnitStr}
+          onChange={(e) => {
+            const val = e.target.value.replace(/[^\d.]/g, '');
+            setPrecioUnitStr(val);
+          }}
         />
 
         <FormControl>
@@ -220,9 +243,12 @@ function DetalleModal({
         {(tipoCont === 'caja' || tipoCont === 'paquete') && (
           <TextField
             label="Unid x Cont."
-            type="number"
-            value={upc}
-            onChange={(e) => setUpc(Number(e.target.value))}
+            type="text"
+            value={upcStr}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^\d.]/g, '');
+              setUpcStr(val);
+            }}
             sx={{ width: 120 }}
           />
         )}
@@ -239,11 +265,15 @@ function DetalleModal({
           onChange={(e) => setCaducidad(e.target.value)}
           InputLabelProps={{ shrink: true }}
         />
+
         <TextField
           label="Precio de Venta"
-          type="number"
-          value={precioVenta}
-          onChange={(e) => setPrecioVenta(Number(e.target.value))}
+          type="text"
+          value={precioVentaStr}
+          onChange={(e) => {
+            const val = e.target.value.replace(/[^\d.]/g, '');
+            setPrecioVentaStr(val);
+          }}
         />
       </DialogContent>
       <DialogActions>
@@ -275,10 +305,8 @@ export default function Compras() {
   const [observaciones, setObservaciones] = useState('');
   const [detalles, setDetalles] = useState<DetalleCompra[]>([]);
 
-  // Submodal de Detalle (para forzar a llenar antes de agregar)
+  // Submodal de Detalle
   const [openDetalleModal, setOpenDetalleModal] = useState(false);
-
-  // (NUEVO) si queremos preseleccionar un producto en DetalleModal:
   const [preselectedProductId, setPreselectedProductId] = useState<number | null>(null);
 
   // Confirm Dialog
@@ -319,20 +347,13 @@ export default function Compras() {
   useEffect(() => {
     const st: any = location.state;
     if (st?.openModal === 'createCompra') {
-      // 1) Abre el modal principal
       handleOpenCreate();
-
-      // 2) si st.openDetalle === true => abre submodal con productId preseleccionado
       if (st.openDetalle === true && typeof st.productId === 'number') {
-        // Esperamos un breve delay para asegurar que el modal principal se "monta"
-        // y luego abrimos el submodal
         setTimeout(() => {
           setPreselectedProductId(st.productId);
           setOpenDetalleModal(true);
         }, 200);
       }
-
-      // Limpia el state para que no reabra al recargar
       navigate(location.pathname, { replace: true });
     }
   }, [location.state, navigate]);
@@ -349,25 +370,21 @@ export default function Compras() {
     setOpenModal(false);
   }
 
-  /** Abrir submodal de Detalle manualmente (sin escaneo) */
   function handleOpenDetalleModal() {
     if (!openModal) {
-      // Si no está abierto el modal principal, lo abrimos
       handleOpenCreate();
     }
-    setPreselectedProductId(null); // sin preselección en este caso
+    setPreselectedProductId(null);
     setOpenDetalleModal(true);
   }
   function handleCloseDetalleModal() {
     setOpenDetalleModal(false);
   }
 
-  /** onSave => se añade a la lista `detalles` */
   function handleAddDetalle(detalle: DetalleCompra) {
     setDetalles((prev) => [...prev, detalle]);
   }
 
-  /** Quitar renglón */
   function removeRenglonDetalle(idx: number) {
     setDetalles((prev) => {
       const copy = [...prev];
@@ -376,7 +393,6 @@ export default function Compras() {
     });
   }
 
-  /** Calcular total */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => {
       let sub = 0;
@@ -392,12 +408,22 @@ export default function Compras() {
     }, 0);
   }
 
-  /** Guardar la compra al backend */
   async function handleSaveCompra() {
+    // 1) Proveedor obligatorio
+    if (proveedorId <= 0) {
+      alert('Selecciona un proveedor válido antes de guardar.');
+      return;
+    }
+    // 2) Al menos 1 producto
+    if (detalles.length === 0) {
+      alert('Debes agregar al menos un producto (renglón) antes de guardar.');
+      return;
+    }
+
     const total = calcularTotal();
     const action = async () => {
       try {
-        const purchaseData = {
+        const purchaseData: Purchase = {
           proveedorId,
           fecha,
           total,
@@ -415,6 +441,7 @@ export default function Compras() {
         closeConfirmDialog();
       }
     };
+
     openConfirmDialog(
       'Confirmar creación',
       `¿Deseas CREAR esta compra con ${detalles.length} renglones?`,
@@ -423,7 +450,6 @@ export default function Compras() {
     setOpenModal(false);
   }
 
-  /** Confirm dialog helpers */
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -434,7 +460,6 @@ export default function Compras() {
     setConfirmOpen(false);
   }
 
-  /** Ver detalles de una compra existente */
   async function handleVerDetalles(compraId: number) {
     try {
       setViewCompraId(compraId);
@@ -451,7 +476,6 @@ export default function Compras() {
     setViewCompraId(null);
   }
 
-  /** Eliminar compra */
   function handleDeleteCompra(compra: Purchase) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -473,7 +497,6 @@ export default function Compras() {
     );
   }
 
-  // =============== RENDER ===============
   if (loading) {
     return <p>Cargando compras...</p>;
   }
@@ -598,9 +621,13 @@ export default function Compras() {
               label="Proveedor"
               onChange={(e) => setProveedorId(Number(e.target.value))}
             >
-              <MenuItem value="">-- Seleccionar --</MenuItem>
+              <MenuItem value={0} disabled>
+                -- Seleccionar --
+              </MenuItem>
               {providers.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.nombre}</MenuItem>
+                <MenuItem key={p.id} value={p.id}>
+                  {p.nombre}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -625,7 +652,6 @@ export default function Compras() {
             Detalles
           </Typography>
 
-          {/* Botón para abrir submodal: DetalleModal */}
           <Button variant="outlined" color="info" onClick={handleOpenDetalleModal}>
             <AddIcon /> Agregar Producto
           </Button>
@@ -651,7 +677,10 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detalles.map((d, idx) => {
-                  const prodName = products.find(pp => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
+                  const prodName =
+                    products.find((pp) => pp.id === d.productoId)?.nombre ||
+                    `ID=${d.productoId}`;
+
                   let sub = 0;
                   let precioPorPieza = 0;
                   const upc = d.unidadesPorContenedor ?? 1;
@@ -667,9 +696,9 @@ export default function Compras() {
                     precioPorPieza = d.precioUnitario;
                   }
 
-                  const piezasTotales = (d.tipoContenedor === 'unidad')
+                  const piezasTotales = d.tipoContenedor === 'unidad'
                     ? d.cantidad
-                    : (d.cantidad * upc);
+                    : d.cantidad * upc;
 
                   return (
                     <TableRow key={idx}>
@@ -708,6 +737,7 @@ export default function Compras() {
                     </TableRow>
                   );
                 })}
+
                 {detalles.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={12} align="center">
@@ -725,22 +755,25 @@ export default function Compras() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseModal}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveCompra}>
+          <Button
+            variant="contained"
+            onClick={handleSaveCompra}
+          >
             Guardar
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* ============ Submodal de detalle, para forzar llenado de datos ============ */}
+      {/* Submodal de detalle */}
       <DetalleModal
         open={openDetalleModal}
         onClose={handleCloseDetalleModal}
         onSave={handleAddDetalle}
         products={products}
-        preselectedProductId={preselectedProductId}  // NUEVO: preselección
+        preselectedProductId={preselectedProductId}
       />
 
-      {/* ============ Modal Ver Detalles de una Compra existente ============ */}
+      {/* Modal Ver Detalles de una Compra existente */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}
@@ -772,7 +805,7 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detallesCompra.map((d) => {
-                  const product = products.find(pp => pp.id === d.productoId);
+                  const product = products.find((pp) => pp.id === d.productoId);
                   const pName = product?.nombre || `ID=${d.productoId}`;
 
                   let sub = 0;
@@ -790,7 +823,6 @@ export default function Compras() {
                       ? d.cantidad
                       : d.cantidad * upc;
 
-                  // precioPorPieza si tu backend lo guarda
                   const precioPorPieza = d.precioPorPieza
                     ? d.precioPorPieza.toFixed(2)
                     : '—';
@@ -823,12 +855,12 @@ export default function Compras() {
                       <TableCell>
                         {d.updatedAt
                           ? new Date(d.updatedAt).toLocaleString()
-                          : '—'
-                        }
+                          : '—'}
                       </TableCell>
                     </TableRow>
                   );
                 })}
+
                 {detallesCompra.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={12} align="center">

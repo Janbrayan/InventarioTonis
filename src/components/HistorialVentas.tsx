@@ -153,77 +153,103 @@ export default function HistorialVentas() {
   }
 
   return (
-    <Box sx={{ p: 3, width: '100%' }}>
+    <Box sx={{ p: 3, width: '100%', color: '#fff' }}>
       <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: '#212529' }}>
         Historial de Ventas
       </Typography>
 
-      {/* Barra para seleccionar el rango */}
-      <Box sx={{ display: 'flex', mb: 2, gap: 2, alignItems: 'center' }}>
-        <FormControl
-          sx={{
-            minWidth: 160,
-            backgroundColor: '#2b3640',
-            borderRadius: 1,
-            p: 1
-          }}
-        >
-          <InputLabel
-            id="filtro-rango-label"
-            sx={{ color: '#fff' }} // Label en blanco
-          >
-            Filtro
-          </InputLabel>
-          <Select
-            labelId="filtro-rango-label"
-            label="Filtro"
-            value={filtro}
-            onChange={handleChangeFiltro}
-            // Estilos personalizados para el tema oscuro
-            sx={{
-              color: '#fff',
-              '.MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-              '.MuiSvgIcon-root': {
-                color: '#fff',
-              },
-            }}
-            MenuProps={{
-              sx: {
-                '&& .MuiPaper-root': {
-                  backgroundColor: '#2b3640', // fondo del menú
-                  border: '1px solid #444',   // borde opcional
-                },
-                '&& .MuiMenuItem-root': {
-                  color: '#fff',
-                },
-                '&& .MuiMenuItem-root.Mui-selected': {
-                  backgroundColor: '#3e4a55',
-                },
-              },
-            }}
-          >
-            <MenuItem value="day">Día</MenuItem>
-            <MenuItem value="week">Semana</MenuItem>
-            <MenuItem value="month">Mes</MenuItem>
-            <MenuItem value="all">Todo el tiempo</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-
-      {/* Tarjeta para listar las ventas */}
-      <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      {/* Pequeña tarjeta con el Select de filtros */}
+      <Card
+        sx={{
+          mb: 2,
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              Listado Completo
+              Opciones de Filtro
+            </Typography>
+          }
+          sx={{
+            backgroundColor: '#343a40',
+            borderRadius: '8px 8px 0 0',
+            pb: 1
+          }}
+        />
+        <CardContent sx={{ p: 2 }}>
+          <FormControl
+            sx={{
+              minWidth: 160,
+              backgroundColor: '#2b3640',
+              borderRadius: 1,
+              mr: 2
+            }}
+          >
+            <InputLabel id="filtro-rango-label" sx={{ color: '#fff' }}>
+              Filtro
+            </InputLabel>
+            <Select
+              labelId="filtro-rango-label"
+              label="Filtro"
+              value={filtro}
+              onChange={handleChangeFiltro}
+              sx={{
+                color: '#fff',
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#fff'
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#fff'
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#fff'
+                },
+                '.MuiSvgIcon-root': {
+                  color: '#fff'
+                }
+              }}
+              MenuProps={{
+                sx: {
+                  '&& .MuiPaper-root': {
+                    backgroundColor: '#2b3640',
+                    border: '1px solid #444'
+                  },
+                  '&& .MuiMenuItem-root': {
+                    color: '#fff'
+                  },
+                  '&& .MuiMenuItem-root.Mui-selected': {
+                    backgroundColor: '#3e4a55'
+                  }
+                }
+              }}
+            >
+              <MenuItem value="day">Día</MenuItem>
+              <MenuItem value="week">Semana</MenuItem>
+              <MenuItem value="month">Mes</MenuItem>
+              <MenuItem value="all">Todo el tiempo</MenuItem>
+            </Select>
+          </FormControl>
+          {/* Aquí podrías poner más opciones o botones si deseas */}
+        </CardContent>
+      </Card>
+
+      {/* Tarjeta para listar las ventas */}
+      <Card
+        sx={{
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff'
+        }}
+      >
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              Listado de Ventas
             </Typography>
           }
           sx={{
@@ -235,10 +261,18 @@ export default function HistorialVentas() {
         <CardContent sx={{ p: 0 }}>
           <TableContainer
             component={Paper}
-            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+            sx={{
+              borderRadius: '0 0 8px 8px',
+              backgroundColor: '#2b3640'
+            }}
           >
             <Table>
-              <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
+              <TableHead
+                sx={{
+                  backgroundColor: '#25303a',
+                  '& th': { color: '#fff' }
+                }}
+              >
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Fecha</TableCell>
@@ -252,12 +286,16 @@ export default function HistorialVentas() {
                   <TableRow
                     key={venta.id}
                     sx={{
-                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.05)'
+                      }
                     }}
                   >
                     <TableCell sx={{ color: '#fff' }}>{venta.id}</TableCell>
                     <TableCell sx={{ color: '#fff' }}>
-                      {venta.createdAt ? new Date(venta.createdAt).toLocaleString() : '—'}
+                      {venta.createdAt
+                        ? new Date(venta.createdAt).toLocaleString()
+                        : '—'}
                     </TableCell>
                     <TableCell sx={{ color: '#fff' }}>
                       {venta.total != null ? `$${venta.total.toFixed(2)}` : '—'}
@@ -289,11 +327,7 @@ export default function HistorialVentas() {
                 {/* Fila con la suma total de las ventas */}
                 {ventas.length > 0 && (
                   <TableRow>
-                    <TableCell
-                      colSpan={2}
-                      align="right"
-                      sx={{ color: '#fff', fontWeight: 'bold' }}
-                    >
+                    <TableCell colSpan={2} align="right" sx={{ color: '#fff', fontWeight: 'bold' }}>
                       SUMA TOTAL:
                     </TableCell>
                     <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
