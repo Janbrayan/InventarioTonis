@@ -12,6 +12,8 @@ interface DBProduct {
   activo: number;
   createdAt: string;
   updatedAt: string;
+  /** NUEVO: Añadimos esta propiedad para manejar la suma de lotes. */
+  stock?: number;
 }
 
 export interface Product {
@@ -24,19 +26,29 @@ export interface Product {
   activo?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  /** NUEVO: Para mostrar el stock total, calculado desde lotes. */
+  stock?: number;
 }
 
 export class ProductService {
   /**
-   * Obtiene la lista completa de productos.
+   * Obtiene la lista completa de productos,
+   * sumando el stock desde 'lotes' activos (cantidadActual).
    */
   static async getProducts(): Promise<Product[]> {
     try {
+      // Hacemos LEFT JOIN con 'lotes' (activo=1) para sumar 'cantidadActual'
+      // y obtenemos un campo 'stock' con la sumatoria de sus lotes.
       const rows = db.prepare(`
         SELECT
-          id, nombre, categoriaId, precioCompra, precioVenta,
-          codigoBarras, activo, createdAt, updatedAt
-        FROM products
+          p.id, p.nombre, p.categoriaId, p.precioCompra, p.precioVenta,
+          p.codigoBarras, p.activo, p.createdAt, p.updatedAt,
+          IFNULL(SUM(l.cantidadActual), 0) AS stock
+        FROM products p
+        LEFT JOIN lotes l
+          ON l.productoId = p.id
+          AND l.activo = 1
+        GROUP BY p.id
       `).all() as DBProduct[];
 
       return rows.map((r) => ({
@@ -49,6 +61,8 @@ export class ProductService {
         activo: !!r.activo,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
+        // NUEVO: Retornamos la propiedad 'stock' calculada.
+        stock: r.stock ?? 0
       }));
     } catch (error) {
       console.error('Error getProducts:', error);

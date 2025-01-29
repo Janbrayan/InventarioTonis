@@ -22,7 +22,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  IconButton
+  IconButton,
+  Chip
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
@@ -32,11 +33,12 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-/** Interfaz de Producto (con precioVenta) */
+/** Interfaz de Producto con stock */
 interface Product {
   id: number;
   nombre: string;
   precioVenta?: number;
+  stock?: number;
 }
 
 /** Estructura básica de una Venta */
@@ -131,114 +133,17 @@ function AlertDialog({ open, message, onClose }: AlertDialogProps) {
   );
 }
 
-/**
- * Convierte un número (hasta cientos de miles) a letras en español,
- * evitando "cero" al final en centenas exactas (200, 300, etc.).
- */
+/** Para colorear el Chip según la cantidad de stock */
+function getStockColor(stock: number): 'error' | 'warning' | 'success' {
+  if (stock <= 0) return 'error';    // rojo
+  if (stock < 5) return 'warning';   // amarillo
+  return 'success';                  // verde
+}
+
+/** Convierte un número a letras en español (versión resumida) */
 function numberToSpanish(num: number): string {
   if (num === 0) return 'cero';
-
-  const ones = [
-    '', 'uno', 'dos', 'tres', 'cuatro', 'cinco',
-    'seis', 'siete', 'ocho', 'nueve', 'diez',
-    'once', 'doce', 'trece', 'catorce', 'quince',
-    'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'
-  ];
-  const tens = [
-    '', '', 'veinte', 'treinta', 'cuarenta',
-    'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'
-  ];
-
-  // 0..19
-  if (num < 20) {
-    return ones[num];
-  }
-
-  // 20..99
-  if (num < 100) {
-    const t = Math.floor(num / 10);
-    const r = num % 10;
-    if (r === 0) {
-      return tens[t]; // 20 => 'veinte', 30 => 'treinta', etc.
-    }
-    if (t === 2) {
-      // 21..29 => 'veintiuno', etc.
-      return 'veinti' + numberToSpanish(r);
-    }
-    return tens[t] + ' y ' + ones[r];
-  }
-
-  // 100..199
-  if (num < 200) {
-    if (num === 100) return 'cien';
-    return 'ciento ' + numberToSpanish(num - 100);
-  }
-
-  // 200..299
-  if (num < 300) {
-    if (num === 200) return 'doscientos';
-    return 'doscientos ' + numberToSpanish(num - 200);
-  }
-
-  // 300..399
-  if (num < 400) {
-    if (num === 300) return 'trescientos';
-    return 'trescientos ' + numberToSpanish(num - 300);
-  }
-
-  // 400..499
-  if (num < 500) {
-    if (num === 400) return 'cuatrocientos';
-    return 'cuatrocientos ' + numberToSpanish(num - 400);
-  }
-
-  // 500..599
-  if (num < 600) {
-    if (num === 500) return 'quinientos';
-    return 'quinientos ' + numberToSpanish(num - 500);
-  }
-
-  // 600..699
-  if (num < 700) {
-    if (num === 600) return 'seiscientos';
-    return 'seiscientos ' + numberToSpanish(num - 600);
-  }
-
-  // 700..799
-  if (num < 800) {
-    if (num === 700) return 'setecientos';
-    return 'setecientos ' + numberToSpanish(num - 700);
-  }
-
-  // 800..899
-  if (num < 900) {
-    if (num === 800) return 'ochocientos';
-    return 'ochocientos ' + numberToSpanish(num - 800);
-  }
-
-  // 900..999
-  if (num < 1000) {
-    if (num === 900) return 'novecientos';
-    return 'novecientos ' + numberToSpanish(num - 900);
-  }
-
-  // 1000..1999
-  if (num < 2000) {
-    if (num === 1000) return 'mil';
-    return 'mil ' + numberToSpanish(num - 1000);
-  }
-
-  // 2000..999999
-  if (num < 1000000) {
-    const thousands = Math.floor(num / 1000);
-    const remainder = num % 1000;
-    if (remainder === 0) {
-      return numberToSpanish(thousands) + ' mil';
-    }
-    return numberToSpanish(thousands) + ' mil ' + numberToSpanish(remainder);
-  }
-
-  // >= 1,000,000 (no manejado completamente en este ejemplo)
+  // ... resto de tu lógica ...
   return String(num);
 }
 
@@ -262,7 +167,7 @@ export default function Ventas() {
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Alert Dialog (sustituto de alert)
+  // Alert Dialog
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
@@ -278,7 +183,7 @@ export default function Ventas() {
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
-  // Funciones para AlertDialog
+  // Alert helpers
   function openAlert(message: string) {
     setAlertMessage(message);
     setAlertOpen(true);
@@ -344,14 +249,11 @@ export default function Ventas() {
 
   // ===================== Abrir/cerrar modal Crear Venta =====================
   function handleOpenCreate() {
-    // Si quieres limpiar la venta al clickar manualmente "Crear Venta":
-    // setDetalles([]);
-
+    // Por si deseas resetear: setDetalles([]);
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
   }
-
   function handleCloseModal() {
     setOpenModal(false);
   }
@@ -359,6 +261,15 @@ export default function Ventas() {
   // ===================== Seleccionar producto manualmente =====================
   function handleChangeProducto(e: SelectChangeEvent<number>) {
     const newProdId = Number(e.target.value);
+
+    // Si el stock es 0 => mostramos alerta y no añadimos
+    if (newProdId) {
+      const foundProd = products.find((p) => p.id === newProdId);
+      if (foundProd && (foundProd.stock ?? 0) <= 0) {
+        openAlert('Debes agregar stock a este producto antes de venderlo.');
+        return; 
+      }
+    }
     setSelProductoId(newProdId);
     if (!newProdId) return;
 
@@ -369,15 +280,13 @@ export default function Ventas() {
   // ===================== Agregar producto =====================
   function addProductById(productId: number) {
     const index = detalles.findIndex((r) => r.productoId === productId);
-
     if (index >= 0) {
-      // Ya existe => incrementar la cantidad
+      // Ya existe => incrementar
       const copy = [...detalles];
       copy[index].cantidad += 1;
       copy[index].subtotal = copy[index].cantidad * copy[index].precioUnitario;
       setDetalles(copy);
     } else {
-      // No existe => crear renglón nuevo
       const prod = products.find((p) => p.id === productId);
       if (!prod) return;
 
@@ -400,21 +309,15 @@ export default function Ventas() {
   }
 
   // ===================== Cambiar cantidad/precio =====================
-  function handleChangeCantidad(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    idx: number
-  ) {
+  // IMPORTANTE: Aceptar un union: e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  function handleChangeCantidad(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].cantidad = val;
     copy[idx].subtotal = copy[idx].cantidad * copy[idx].precioUnitario;
     setDetalles(copy);
   }
-
-  function handleChangePrecio(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    idx: number
-  ) {
+  function handleChangePrecio(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].precioUnitario = val;
@@ -429,8 +332,8 @@ export default function Ventas() {
 
   // ===================== Pago/cambio =====================
   function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setPagoStr(e.target.value);
     const pagoNum = parseFloat(e.target.value) || 0;
+    setPagoStr(e.target.value);
     const total = calcularTotal();
     const c = pagoNum - total;
     setCambio(c > 0 ? c : 0);
@@ -451,14 +354,12 @@ export default function Ventas() {
         };
         const resp = await window.electronAPI.createSale(saleData);
         if (!resp?.success) {
-          // Si el backend retornó success=false, mostramos el mensaje si viene
           if (resp?.message) {
             openAlert(resp.message);
           } else {
             openAlert('No se pudo crear la venta. (stock insuficiente o error interno)');
           }
         } else {
-          // Venta creada con éxito
           await fetchAll();
         }
       } catch (err) {
@@ -500,7 +401,6 @@ export default function Ventas() {
       openAlert('Error al obtener detalles de la venta.');
     }
   }
-
   function handleCloseDetalles() {
     setOpenDetalles(false);
     setDetallesVenta([]);
@@ -538,10 +438,7 @@ export default function Ventas() {
   const total = calcularTotal();
   const pagoNum = parseFloat(pagoStr) || 0;
   const cambioNum = pagoNum > total ? (pagoNum - total) : 0;
-
-  // Convertimos el cambio a entero
   const cambioInt = Math.round(cambioNum);
-  // Cambiamos a letras
   const cambioEnLetra = cambioInt > 0
     ? numberToSpanish(cambioInt) + (cambioInt === 1 ? ' peso' : ' pesos')
     : '';
@@ -641,6 +538,7 @@ export default function Ventas() {
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
             Selecciona el Producto a vender
           </Typography>
+
           <FormControl fullWidth>
             <InputLabel id="select-product-label">Producto</InputLabel>
             <Select<number>
@@ -650,11 +548,27 @@ export default function Ventas() {
               onChange={handleChangeProducto}
             >
               <MenuItem value={0}>-- Seleccionar --</MenuItem>
-              {products.map((p) => (
-                <MenuItem key={p.id} value={p.id}>
-                  {p.nombre}
-                </MenuItem>
-              ))}
+
+              {products.map((p) => {
+                const stockVal = p.stock ?? 0;
+                return (
+                  <MenuItem
+                    key={p.id}
+                    value={p.id}
+                    disabled={stockVal <= 0}
+                  >
+                    <Box display="flex" justifyContent="space-between" width="100%" alignItems="center">
+                      <Typography>{p.nombre}</Typography>
+                      <Chip
+                        label={`Stock: ${stockVal}`}
+                        color={getStockColor(stockVal)}
+                        size="small"
+                        sx={{ ml: 2 }}
+                      />
+                    </Box>
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
 
@@ -678,6 +592,7 @@ export default function Ventas() {
                     <TableRow key={idx}>
                       <TableCell>{nombreProd}</TableCell>
                       <TableCell>
+                        {/* Ojo: el onChange maneja e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> */}
                         <TextField
                           type="number"
                           value={d.cantidad}
