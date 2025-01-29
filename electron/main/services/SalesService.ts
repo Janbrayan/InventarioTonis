@@ -40,9 +40,6 @@ interface DBLoteRow {
   // ... si gustas, agrega más campos como "activo", "lote", etc.
 }
 
-/**
- * Servicio de Ventas, con lógica FEFO (descontar lote con caducidad más próxima).
- */
 export class SalesService {
   /** Listar todas las ventas (encabezado). */
   static async getSales(): Promise<Sale[]> {
@@ -97,16 +94,49 @@ export class SalesService {
     }
   }
 
-  /** Crear Venta (encabezado + detalles) + descontar lotes (FEFO) */
-  static async createSale(sale: Sale): Promise<{ success: boolean }> {
+  /**
+   * Crear Venta (encabezado + detalles) + descontar lotes (FEFO),
+   * con verificación previa de stock para impedir venta si no hay existencias suficientes.
+   */
+  static async createSale(sale: Sale): Promise<{ success: boolean; message?: string }> {
     // Hora local de México
     const now = getHoraLocalCDMX();
 
+    // =================== (NUEVO) Verificación previa de stock ===================
+    if (sale.detalles && sale.detalles.length > 0) {
+      for (const det of sale.detalles) {
+        // Calculamos cuántas “piezas” reales requiere este renglón
+        let piezasRequeridas = det.cantidad;
+        if (det.tipoContenedor === 'caja' || det.tipoContenedor === 'paquete') {
+          const upc = det.unidadesPorContenedor ?? 1;
+          piezasRequeridas = det.cantidad * upc;
+        }
+
+        // Consultamos el stock total disponible en lotes activos para este producto
+        const stockRow = db.prepare(`
+          SELECT IFNULL(SUM(cantidadActual), 0) AS totalStock
+          FROM lotes
+          WHERE productoId = ?
+            AND activo = 1
+            AND cantidadActual > 0
+        `).get(det.productoId) as { totalStock: number } | undefined;
+
+        const stockDisponible = stockRow?.totalStock ?? 0;
+
+        // Si NO alcanza el stock, lanzamos un error para interrumpir la transacción
+        if (piezasRequeridas > stockDisponible) {
+          throw new Error(
+            `No hay stock suficiente para producto #${det.productoId}. ` +
+            `Requerido: ${piezasRequeridas}, disponible: ${stockDisponible}`
+          );
+        }
+      }
+    }
+    // =========================================================================
+
     const tx = db.transaction(() => {
       // 1) Insertar encabezado en 'sales'
-      //    Si el front no manda sale.fecha, usamos 'now'
       const fechaVenta = sale.fecha ?? now;
-
       const result = db.prepare(`
         INSERT INTO sales (fecha, total, observaciones, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?)
@@ -131,13 +161,13 @@ export class SalesService {
         `);
 
         for (const det of sale.detalles) {
-          // Subtotal según contenedores
+          // Subtotal según contenedores (ejemplo con 'paquete')
           let sub = det.cantidad * det.precioUnitario;
           if (det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
             sub = det.cantidad * upc * det.precioUnitario;
           }
-          // Si "caja" también multiplica, agrégalo
+          // Si manejas 'caja', haz algo similar
 
           // piezasVendidas
           let piezas = det.cantidad;
@@ -186,26 +216,21 @@ export class SalesService {
                 AND activo = 1
                 AND cantidadActual > 0
               ORDER BY
-                CASE WHEN fechaCaducidad IS NULL THEN 999999999 END, -- si no hay fecha, va al final
+                CASE WHEN fechaCaducidad IS NULL THEN 999999999 END,
                 fechaCaducidad ASC,
                 id ASC
               LIMIT 1
             `).get(det.productoId) as DBLoteRow | undefined;
 
             if (!loteRow) {
-              // No hay más lotes con stock
+              // No hay más lotes con stock => salimos
               break;
             }
 
             const canUse = loteRow.cantidadActual;
-            let used = 0;
-            if (canUse >= toDiscount) {
-              used = toDiscount;
-            } else {
-              used = canUse;
-            }
-
+            const used = Math.min(canUse, toDiscount);
             const newQty = canUse - used;
+
             db.prepare(`
               UPDATE lotes
               SET cantidadActual = ?
@@ -219,11 +244,12 @@ export class SalesService {
     });
 
     try {
-      tx();
+      tx(); // Ejecutamos la transacción
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error createSale:', error);
-      return { success: false };
+      // Retornamos un mensaje de error para poder mostrarlo en el front si se desea
+      return { success: false, message: error.message };
     }
   }
 

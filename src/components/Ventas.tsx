@@ -97,6 +97,40 @@ function ConfirmDialog({
   );
 }
 
+/** Diálogo de alerta (un solo botón “Cerrar”) */
+interface AlertDialogProps {
+  open: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function AlertDialog({ open, message, onClose }: AlertDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{
+        style: {
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          backdropFilter: 'blur(5px)',
+        },
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Alerta</DialogTitle>
+      <DialogContent>
+        <Typography>{message}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} autoFocus>
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /**
  * Convierte un número (hasta cientos de miles) a letras en español,
  * evitando "cero" al final en centenas exactas (200, 300, etc.).
@@ -228,6 +262,10 @@ export default function Ventas() {
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
+  // Alert Dialog (sustituto de alert)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+
   // Modal ver detalles
   const [openDetalles, setOpenDetalles] = useState(false);
   const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
@@ -239,6 +277,16 @@ export default function Ventas() {
   // Pago/cambio
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
+
+  // Funciones para AlertDialog
+  function openAlert(message: string) {
+    setAlertMessage(message);
+    setAlertOpen(true);
+  }
+  function closeAlert() {
+    setAlertOpen(false);
+    setAlertMessage('');
+  }
 
   // ===================== Cargar data (ventas, productos) =====================
   useEffect(() => {
@@ -256,6 +304,7 @@ export default function Ventas() {
       setProducts(prodList || []);
     } catch (err) {
       console.error('Error fetchAll Ventas:', err);
+      openAlert('Error al cargar datos de ventas/productos.');
     } finally {
       setLoading(false);
     }
@@ -351,7 +400,10 @@ export default function Ventas() {
   }
 
   // ===================== Cambiar cantidad/precio =====================
-  function handleChangeCantidad(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
+  function handleChangeCantidad(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    idx: number
+  ) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].cantidad = val;
@@ -359,7 +411,10 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  function handleChangePrecio(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
+  function handleChangePrecio(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    idx: number
+  ) {
     const val = parseFloat(e.target.value) || 0;
     const copy = [...detalles];
     copy[idx].precioUnitario = val;
@@ -396,11 +451,19 @@ export default function Ventas() {
         };
         const resp = await window.electronAPI.createSale(saleData);
         if (!resp?.success) {
-          alert('No se pudo crear la venta.');
+          // Si el backend retornó success=false, mostramos el mensaje si viene
+          if (resp?.message) {
+            openAlert(resp.message);
+          } else {
+            openAlert('No se pudo crear la venta. (stock insuficiente o error interno)');
+          }
+        } else {
+          // Venta creada con éxito
+          await fetchAll();
         }
-        await fetchAll();
       } catch (err) {
         console.error('Error createSale:', err);
+        openAlert('Ocurrió un error al crear la venta.');
       } finally {
         closeConfirmDialog();
       }
@@ -434,6 +497,7 @@ export default function Ventas() {
       setOpenDetalles(true);
     } catch (err) {
       console.error('Error getDetallesByVenta:', err);
+      openAlert('Error al obtener detalles de la venta.');
     }
   }
 
@@ -453,11 +517,13 @@ export default function Ventas() {
           if (!v.id) return;
           const resp = await window.electronAPI.deleteSale(v.id);
           if (!resp?.success) {
-            alert('No se pudo eliminar la venta.');
+            openAlert('No se pudo eliminar la venta.');
+          } else {
+            await fetchAll();
           }
-          await fetchAll();
         } catch (err) {
           console.error('Error deleteSale:', err);
+          openAlert('Ocurrió un error al eliminar la venta.');
         } finally {
           closeConfirmDialog();
         }
@@ -752,6 +818,13 @@ export default function Ventas() {
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+      />
+
+      {/* Alert Dialog */}
+      <AlertDialog
+        open={alertOpen}
+        message={alertMessage}
+        onClose={closeAlert}
       />
     </Box>
   );

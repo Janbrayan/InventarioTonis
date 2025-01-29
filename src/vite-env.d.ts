@@ -56,7 +56,14 @@ declare global {
       // === VENTAS ===
       getSales: () => Promise<any>;
       getSalesToday: () => Promise<any>;
-      createSale: (saleData: any) => Promise<{ success: boolean }>;
+      /**
+       * Se actualiza para incluir `message?: string`,
+       * de modo que TypeScript reconozca dicha propiedad en la respuesta.
+       */
+      createSale: (
+        saleData: any
+      ) => Promise<{ success: boolean; message?: string }>;
+
       deleteSale: (id: number) => Promise<{ success: boolean }>;
       getDetallesByVenta: (ventaId: number) => Promise<any>;
 
