@@ -18,17 +18,16 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
   FormControl,
   InputLabel,
+  Select,
+  MenuItem,
   IconButton,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
   Visibility as VisibilityIcon,
-} from '@mui/icons-material';
+} from '@mui/icons-material'; // <-- Se quita DeleteIcon de aquí
 import { useLocation, useNavigate } from 'react-router-dom';
 
 /** =============== Tipos de datos básicos =============== */
@@ -355,6 +354,7 @@ export default function Compras() {
   // Estado de error general (para reemplazar alerts)
   const [error, setError] = useState('');
 
+  // Al montar, cargar data
   useEffect(() => {
     fetchAll();
   }, []);
@@ -442,16 +442,15 @@ export default function Compras() {
     }, 0);
   }
 
-  /** Guardar compra */
+  /** NO CERRAMOS el modal si hay error: permitimos corregir */
   function handleSaveCompra() {
-    // Validaciones mínimas antes de la confirmación
     if (proveedorId <= 0) {
       setError('Debes seleccionar un Proveedor antes de guardar.');
-      return;
+      return; // No cierra modal
     }
     if (detalles.length === 0) {
       setError('Debes agregar al menos un Producto antes de guardar.');
-      return;
+      return; // No cierra modal
     }
 
     const total = calcularTotal();
@@ -463,8 +462,7 @@ export default function Compras() {
       })
       .join('\n');
 
-    const message =
-      `Información de los productos a comprar:\n\n${productSummary}\n\n` +
+    const message = `Información de los productos a comprar:\n\n${productSummary}\n\n` +
       `Total: $${total.toFixed(2)}\n\n¿Deseas REALIZAR esta compra?`;
 
     // La acción real de guardar se hace hasta que el usuario confirma
@@ -479,7 +477,7 @@ export default function Compras() {
         };
         const resp = await window.electronAPI.createPurchase(purchaseData);
         if (!resp?.success) {
-          setError('No se pudo crear la compra en la base de datos.');
+          setError('No se pudo crear la compra.');
         } else {
           // Al confirmar y guardar con éxito, cerramos el modal
           setOpenModal(false);
@@ -487,7 +485,6 @@ export default function Compras() {
         await fetchAll();
       } catch (err) {
         console.error('Error createPurchase:', err);
-        setError('Error al crear la compra.');
       } finally {
         closeConfirmDialog();
       }
@@ -514,7 +511,6 @@ export default function Compras() {
       setOpenDetalles(true);
     } catch (err) {
       console.error('Error getDetallesByCompra:', err);
-      setError('No se pudo cargar los detalles de la compra.');
     }
   }
   function handleCloseDetalles() {
@@ -522,6 +518,9 @@ export default function Compras() {
     setDetallesCompra([]);
     setViewCompraId(null);
   }
+
+  // QUITAMOS la opción de eliminar en la tabla principal (el ícono)
+  // => todo lo demás igual
 
   function handleDeleteCompra(compra: Purchase) {
     openConfirmDialog(
@@ -537,7 +536,6 @@ export default function Compras() {
           await fetchAll();
         } catch (err) {
           console.error('Error deletePurchase:', err);
-          setError('Error al eliminar la compra.');
         } finally {
           closeConfirmDialog();
         }
@@ -630,14 +628,7 @@ export default function Compras() {
                         >
                           <VisibilityIcon />
                         </IconButton>
-                        <IconButton
-                          color="error"
-                          size="small"
-                          onClick={() => handleDeleteCompra(c)}
-                          sx={{ ml: 1 }}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                        {/* Ícono de eliminar removido */}
                       </TableCell>
                     </TableRow>
                   );
@@ -867,8 +858,6 @@ export default function Compras() {
                     ? d.cantidad
                     : d.cantidad * upc;
 
-                  // si tu backend ya guarda precioPorPieza, puedes usar d.precioPorPieza
-                  // aquí lo mostramos como ejemplo
                   const precioPorPieza = (d as any).precioPorPieza
                     ? (d as any).precioPorPieza.toFixed(2)
                     : '—';
