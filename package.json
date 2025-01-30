@@ -26,6 +26,7 @@
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@mui/icons-material": "^6.4.0",
     "@mui/material": "^6.4.0",
+    "@mui/system": "^6.4.2",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^11.8.1",
     "dayjs": "^1.11.13",

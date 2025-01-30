@@ -21,7 +21,9 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -74,7 +76,7 @@ function ConfirmDialog({
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
-        <Typography>{message}</Typography>
+        <Typography whiteSpace="pre-line">{message}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
@@ -136,7 +138,7 @@ export default function GestionProductos() {
   const [precioVentaStr, setPrecioVentaStr] = useState('0');
 
   const [codigoBarras, setCodigoBarras] = useState('');
-  const [activo] = useState(true); // si tuvieras un Switch/Checkbox, lo manejarías aquí
+  const [activo, setActivo] = useState(true); // Switch para marcar producto activo/inactivo
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -195,7 +197,7 @@ export default function GestionProductos() {
     setPrecioCompraStr('0');
     setPrecioVentaStr('0');
     setCodigoBarras(barcode ?? '');
-    // setActivo(true); // si tuvieses un checkbox, reinit
+    setActivo(true);
     setOpenModal(true);
   }
 
@@ -207,7 +209,7 @@ export default function GestionProductos() {
     setPrecioCompraStr((prod.precioCompra ?? 0).toString());
     setPrecioVentaStr((prod.precioVenta ?? 0).toString());
     setCodigoBarras(prod.codigoBarras ?? '');
-    // setActivo(prod.activo ?? true);
+    setActivo(prod.activo ?? true);
     setOpenModal(true);
   }
 
@@ -239,15 +241,76 @@ export default function GestionProductos() {
       return;
     }
 
+    // Revisamos que no exista otro producto con el mismo nombre
+    const nombreLower = nombre.trim().toLowerCase();
+    if (!editingProduct) {
+      // Creación
+      const sameName = products.find(
+        (p) => p.nombre.trim().toLowerCase() === nombreLower
+      );
+      if (sameName) {
+        setError(`Ya existe un producto con el mismo nombre: "${nombre}".`);
+        return;
+      }
+      // Revisar duplicado en código de barras (si lo tiene)
+      if (codigoBarras.trim()) {
+        const sameBarcode = products.find(
+          (p) => (p.codigoBarras ?? '').trim() === codigoBarras.trim()
+        );
+        if (sameBarcode) {
+          setError(`Ya existe un producto con el mismo código de barras: "${codigoBarras}".`);
+          return;
+        }
+      }
+    } else {
+      // Edición
+      const sameName = products.find(
+        (p) =>
+          p.nombre.trim().toLowerCase() === nombreLower &&
+          p.id !== editingProduct.id
+      );
+      if (sameName) {
+        setError(`Ya existe otro producto con el mismo nombre: "${nombre}".`);
+        return;
+      }
+      if (codigoBarras.trim()) {
+        const sameBarcode = products.find(
+          (p) =>
+            (p.codigoBarras ?? '').trim() === codigoBarras.trim() &&
+            p.id !== editingProduct.id
+        );
+        if (sameBarcode) {
+          setError(`Ya existe otro producto con el mismo código de barras: "${codigoBarras}".`);
+          return;
+        }
+      }
+    }
+
     // Cerrar modal para mostrar luego confirm
     setOpenModal(false);
 
     const isEdit = !!editingProduct;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
+    // Preparamos un mensaje detallado con la info del producto
+    const catName =
+      categoriaId ? categories.find(c => c.id === categoriaId)?.nombre : 'Sin Categoría';
+    const infoProducto = `
+Datos del Producto:
+
+Nombre: ${nombre}
+Categoría: ${catName ?? '—'}
+Precio Compra: $${pc.toFixed(2)}
+Precio Venta: $${pv.toFixed(2)}
+Código de Barras: ${codigoBarras || '—'}
+Activo: ${activo ? 'Sí' : 'No'}
+
+¿Deseas ${actionText} este producto?
+    `;
+
     openConfirmDialog(
       `Confirmar ${actionText}`,
-      `¿Deseas ${actionText} este producto?`,
+      infoProducto,
       async () => {
         try {
           if (!window.electronAPI) return;
@@ -391,10 +454,10 @@ export default function GestionProductos() {
                       <TableCell sx={{ color: '#fff' }}>{prod.nombre}</TableCell>
                       <TableCell sx={{ color: '#fff' }}>{catName}</TableCell>
                       <TableCell sx={{ color: '#fff' }}>
-                        {prod.precioCompra !== undefined ? `$${prod.precioCompra}` : '—'}
+                        {typeof prod.precioCompra === 'number' ? `$${prod.precioCompra}` : '—'}
                       </TableCell>
                       <TableCell sx={{ color: '#fff' }}>
-                        {prod.precioVenta !== undefined ? `$${prod.precioVenta}` : '—'}
+                        {typeof prod.precioVenta === 'number' ? `$${prod.precioVenta}` : '—'}
                       </TableCell>
                       <TableCell sx={{ color: '#fff' }}>
                         {prod.codigoBarras || '—'}
@@ -466,6 +529,7 @@ export default function GestionProductos() {
             onChange={(e) => setNombre(e.target.value)}
             fullWidth
           />
+
           {/* SELECT Categoría */}
           <FormControl fullWidth>
             <InputLabel id="cat-select-label">Categoría</InputLabel>
@@ -515,6 +579,17 @@ export default function GestionProductos() {
             value={codigoBarras}
             onChange={(e) => setCodigoBarras(e.target.value)}
             fullWidth
+          />
+
+          {/* Switch para "activo" */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={activo}
+                onChange={(e) => setActivo(e.target.checked)}
+              />
+            }
+            label="Activo"
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

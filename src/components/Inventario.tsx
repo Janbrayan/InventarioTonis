@@ -243,6 +243,21 @@ export default function Inventario() {
   }
 
   async function handleSaveLote() {
+    // Validaciones obligatorias
+    if (productoId <= 0) {
+      setError('Debes seleccionar un producto.');
+      return;
+    }
+    if (!fechaCaducidad.trim()) {
+      setError('Debes seleccionar una fecha de caducidad.');
+      return;
+    }
+    const cantParsed = parseFloat(cantidadStr) || 0;
+    if (cantParsed <= 0) {
+      setError('La cantidad debe ser mayor que 0.');
+      return;
+    }
+
     // Primero cerramos el modal
     setOpenModal(false);
 
@@ -255,7 +270,8 @@ export default function Inventario() {
       async () => {
         try {
           if (!window.electronAPI) return;
-          const cant = parseFloat(cantidadStr) || 0;
+          // Convertimos la cantidad a número
+          const cant = cantParsed;
 
           if (!isEdit) {
             // Crear

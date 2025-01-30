@@ -93,7 +93,7 @@ function ConfirmDialog({
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
-        <Typography>{message}</Typography>
+        <Typography whiteSpace="pre-line">{message}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
@@ -261,14 +261,18 @@ export default function Ventas() {
 
   /** ============== Abrir/cerrar modal de crear venta ============== */
   function handleOpenCreate() {
-    // Puedes resetear la venta, si gustas
-    // setDetalles([]);
+    // Reseteamos la venta
+    setDetalles([]);
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
   }
   function handleCloseModal() {
+    // Al cerrar, reseteamos todo
     setOpenModal(false);
+    setDetalles([]);
+    setPagoStr('');
+    setCambio(0);
   }
 
   /** ============== Seleccionar producto manualmente ============== */
@@ -372,11 +376,46 @@ export default function Ventas() {
     setCambio(c > 0 ? c : 0);
   }
 
-  /** ============== Guardar Venta ============== */
+  /** ============== Guardar Venta (con confirmación y detalles) ============== */
   async function handleSaveVenta() {
+    // 1) Validar que detalles no esté vacío
+    if (detalles.length === 0) {
+      openAlert('No puedes crear una venta sin productos.');
+      return;
+    }
+
+    const total = calcularTotal();
+    // 2) Armar un mensaje con la info de la venta (productos, total, pago, cambio)
+    const lineas = detalles.map((d, i) => {
+      const prodName = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
+      return `${i + 1}. ${prodName} (x${d.cantidad}) = $${d.subtotal.toFixed(2)}`;
+    }).join('\n');
+
+    const pagoNum = parseFloat(pagoStr) || 0;
+    const c = pagoNum - total;
+    const cambioNum = c > 0 ? c : 0;
+    const cambioInt = Math.round(cambioNum);
+    const cambioEnLetra = cambioInt > 0
+      ? numberToSpanish(cambioInt) + (cambioInt === 1 ? ' peso' : ' pesos')
+      : '';
+
+    // Mensaje a mostrar
+    const infoVenta = `
+Información de la Venta:
+
+Productos:
+${lineas}
+
+Total: $${total.toFixed(2)}
+Pago: $${pagoNum.toFixed(2)}
+Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''}
+
+¿Deseas REALIZAR esta venta?
+    `;
+
+    // 3) Preparamos la acción real
     const action = async () => {
       try {
-        const total = calcularTotal();
         const saleData = {
           total,
           detalles: detalles.map((d) => ({
@@ -403,11 +442,13 @@ export default function Ventas() {
       }
     };
 
+    // 4) Abrimos confirm dialog con la info
     openConfirmDialog(
-      'Confirmar venta',
-      `¿Crear venta con ${detalles.length} renglones?`,
+      'Confirmar Venta',
+      infoVenta,
       action
     );
+    // 5) Cerramos el modal de venta
     setOpenModal(false);
   }
 
@@ -689,8 +730,9 @@ export default function Ventas() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseModal}>Cancelar</Button>
+          {/* Cambiamos a "Realizar Venta" */}
           <Button variant="contained" onClick={handleSaveVenta}>
-            Guardar
+            Realizar Venta
           </Button>
         </DialogActions>
       </Dialog>

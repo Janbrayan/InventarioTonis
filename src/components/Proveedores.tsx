@@ -17,7 +17,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -62,7 +64,7 @@ function ConfirmDialog({
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
-        <Typography>{message}</Typography>
+        <Typography whiteSpace="pre-line">{message}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
@@ -117,7 +119,7 @@ export default function Proveedores() {
   const [contacto, setContacto] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
-  // const [activo, setActivo] = useState(true); // si necesitases un checkbox
+  const [activo, setActivo] = useState(true); // Switch para "activo"
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -153,7 +155,7 @@ export default function Proveedores() {
     setContacto('');
     setTelefono('');
     setEmail('');
-    // setActivo(true);
+    setActivo(true);
     setOpenModal(true);
   }
 
@@ -164,7 +166,7 @@ export default function Proveedores() {
     setContacto(prov.contacto ?? '');
     setTelefono(prov.telefono ?? '');
     setEmail(prov.email ?? '');
-    // setActivo(prov.activo ?? true);
+    setActivo(prov.activo ?? true);
     setOpenModal(true);
   }
 
@@ -190,23 +192,37 @@ export default function Proveedores() {
 
   // ========== Guardar (Crear/Editar) ==========
   async function handleSaveProvider() {
+    // Validar todos los campos
+    if (!nombre.trim() || !contacto.trim() || !telefono.trim() || !email.trim()) {
+      setError('Todos los campos son obligatorios (Nombre, Contacto, Teléfono, Email).');
+      return;
+    }
+
     // Cerramos el modal antes de abrir confirm
     setOpenModal(false);
 
     const isEdit = !!editingProvider;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
+    // Prepara un mensaje para mostrar la info del proveedor
+    const infoProveedor = `
+Información del Proveedor:
+
+Nombre: ${nombre}
+Contacto: ${contacto}
+Teléfono: ${telefono}
+Email: ${email}
+Activo: ${activo ? 'Sí' : 'No'}
+
+¿Deseas ${actionText} este proveedor?
+`;
+
     openConfirmDialog(
       `Confirmar ${actionText}`,
-      `¿Deseas ${actionText} este proveedor?`,
+      infoProveedor,
       async () => {
         try {
           if (!window.electronAPI) return;
-
-          if (!nombre.trim()) {
-            setError('El nombre del proveedor es obligatorio.');
-            return;
-          }
 
           if (!isEdit) {
             // Crear
@@ -215,7 +231,7 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              activo: true
+              activo
             });
             if (!result?.success) {
               setError('No se pudo crear el proveedor en la base de datos.');
@@ -228,7 +244,7 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              activo: true
+              activo
             });
             if (!result?.success) {
               setError('No se pudo actualizar el proveedor en la base de datos.');
@@ -454,6 +470,17 @@ export default function Proveedores() {
             onChange={(e) => setEmail(e.target.value)}
             fullWidth
           />
+
+          {/* Switch para "activo" */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={activo}
+                onChange={(e) => setActivo(e.target.checked)}
+              />
+            }
+            label="Activo"
+          />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={handleCloseModal}>Cancelar</Button>
@@ -476,7 +503,7 @@ export default function Proveedores() {
       <ErrorDialog
         open={!!error}
         errorMessage={error}
-        onClose={() => setError('')}
+        onClose={handleCloseError}
       />
     </Box>
   );

@@ -26,6 +26,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
+import { keyframes } from '@mui/system';
 
 /** ====================== Interfaz de Categoría ====================== */
 interface Category {
@@ -101,6 +102,16 @@ function AlertDialog({ open, message, onClose }: AlertDialogProps) {
   );
 }
 
+/** ====================== Keyframes para animación "shake" ====================== */
+const shakeAnimation = keyframes({
+  '0%': { transform: 'translateX(0)' },
+  '20%': { transform: 'translateX(-5px)' },
+  '40%': { transform: 'translateX(5px)' },
+  '60%': { transform: 'translateX(-5px)' },
+  '80%': { transform: 'translateX(5px)' },
+  '100%': { transform: 'translateX(0)' },
+});
+
 /** ====================== Componente principal ====================== */
 export default function Categorias() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -113,6 +124,9 @@ export default function Categorias() {
   // Campos del formulario
   const [nombre, setNombre] = useState('');
   const [activo, setActivo] = useState(true);
+
+  // Estado para animar el TextField si está vacío
+  const [nameErrorAnim, setNameErrorAnim] = useState(false);
 
   // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -158,6 +172,7 @@ export default function Categorias() {
     setEditingCat(null);
     setNombre('');
     setActivo(true);
+    setNameErrorAnim(false);
     setOpenModal(true);
   }
 
@@ -165,6 +180,7 @@ export default function Categorias() {
     setEditingCat(cat);
     setNombre(cat.nombre);
     setActivo(cat.activo ?? true);
+    setNameErrorAnim(false);
     setOpenModal(true);
   }
 
@@ -201,6 +217,10 @@ export default function Categorias() {
 
           if (!nombre.trim()) {
             openAlert('El nombre de la categoría es obligatorio.');
+            // Activamos la animación
+            setNameErrorAnim(true);
+            // La desactivamos luego de 500ms
+            setTimeout(() => setNameErrorAnim(false), 500);
             return;
           }
 
@@ -392,6 +412,14 @@ export default function Categorias() {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             fullWidth
+            // Mostramos error y animación si nameErrorAnim está activo
+            error={!nombre.trim() && nameErrorAnim}
+            helperText={!nombre.trim() && nameErrorAnim ? '¡Ingresa un nombre!' : ''}
+            sx={{
+              ...(nameErrorAnim && {
+                animation: `${shakeAnimation} 0.4s`,
+              }),
+            }}
           />
 
           {/* Switch para "activo" */}
