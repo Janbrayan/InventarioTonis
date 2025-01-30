@@ -9,8 +9,10 @@ import { LoteService } from './services/LoteService';
 import { SalesService } from './services/SalesService';
 import { StatsService } from './services/StatsService';
 import { HistorialVentasService } from './services/HistorialVentasService';
-// (NUEVO) Importa tu dashboardService:
+// Dashboard
 import { dashboardService } from './services/dashboardService';
+// (NUEVO) VentasEstadisticasService:
+import { VentasEstadisticasService } from './services/VentasEstadisticasService';
 
 export function setupIpcHandlers() {
   // ========== LOGIN ==========
@@ -179,13 +181,13 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (NUEVO) Busqueda de producto por código de barras
+  // Busqueda de producto por código de barras
   ipcMain.handle('get-product-by-barcode', async (_event, barcode: string) => {
     try {
       return await ProductService.getProductByBarcode(barcode);
     } catch (error) {
       console.error('Error get-product-by-barcode:', error);
-      return null; // o { success: false } si lo prefieres
+      return null;
     }
   });
 
@@ -273,10 +275,9 @@ export function setupIpcHandlers() {
     }
   });
 
-  // NUEVO: Descuento de lotes por consumo interno / merma
+  // Descuento de lotes (consumo interno / merma)
   ipcMain.handle('descontar-por-consumo', async (_event, data) => {
     try {
-      // data = { loteId, cantidad, motivo? }
       return await LoteService.descontarPorConsumo(data);
     } catch (error) {
       console.error('Error descontar-por-consumo IPC:', error);
@@ -284,7 +285,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (NUEVO) Obtener inventario agrupado (productos + lotes + total)
+  // (NUEVO) Obtener inventario agrupado
   ipcMain.handle('get-inventory-grouped', async () => {
     try {
       return await LoteService.getInventoryGrouped();
@@ -304,7 +305,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (NUEVO) getSalesToday
   ipcMain.handle('get-sales-today', async () => {
     try {
       return await SalesService.getSalesToday();
@@ -324,7 +324,7 @@ export function setupIpcHandlers() {
   });
 
   ipcMain.handle('delete-sale', async (_event, id) => {
-    // Ejemplo si no implementas la eliminación de venta:
+    // Ejemplo: si no implementas la eliminación
     return { success: false, error: 'delete-sale not implemented' };
   });
 
@@ -338,8 +338,6 @@ export function setupIpcHandlers() {
   });
 
   // ========== STATS ==========
-
-  // 1) TotalComprasPorFecha (2 parámetros)
   ipcMain.handle(
     'stats-getTotalComprasPorFecha',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
@@ -352,7 +350,6 @@ export function setupIpcHandlers() {
     }
   );
 
-  // 2) ComprasPorProveedor (2 parámetros)
   ipcMain.handle(
     'stats-getComprasPorProveedor',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
@@ -365,7 +362,6 @@ export function setupIpcHandlers() {
     }
   );
 
-  // 3) TotalProductosActivos (sin parámetros)
   ipcMain.handle('stats-getTotalProductosActivos', async () => {
     try {
       return await StatsService.getTotalProductosActivos();
@@ -375,7 +371,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 4) InversionCompraPorProducto (2 parámetros)
   ipcMain.handle(
     'stats-getInversionCompraPorProducto',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
@@ -388,7 +383,6 @@ export function setupIpcHandlers() {
     }
   );
 
-  // 5) ValorTotalInventario (sin parámetros)
   ipcMain.handle('stats-getValorTotalInventario', async () => {
     try {
       return await StatsService.getValorTotalInventario();
@@ -398,7 +392,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 6) StockActualPorProducto
   ipcMain.handle('stats-getStockActualPorProducto', async () => {
     try {
       return await StatsService.getStockActualPorProducto();
@@ -408,7 +401,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 7) ProductosProximosACaducar
   ipcMain.handle('stats-getProductosProximosACaducar', async (_event, dias) => {
     try {
       return await StatsService.getProductosProximosACaducar(dias);
@@ -418,7 +410,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 8) ConsumosPorMotivo
   ipcMain.handle('stats-getConsumosPorMotivo', async () => {
     try {
       return await StatsService.getConsumosPorMotivo();
@@ -428,7 +419,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 9) CantidadTotalConsumos (2 parámetros)
   ipcMain.handle(
     'stats-getCantidadTotalConsumos',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
@@ -441,7 +431,6 @@ export function setupIpcHandlers() {
     }
   );
 
-  // 10) DistribucionProductosPorCategoria (sin parámetros)
   ipcMain.handle('stats-getDistribucionProductosPorCategoria', async () => {
     try {
       return await StatsService.getDistribucionProductosPorCategoria();
@@ -451,7 +440,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 11) NumCategoriasActivasInactivas (sin parámetros)
   ipcMain.handle('stats-getNumCategoriasActivasInactivas', async () => {
     try {
       return await StatsService.getNumCategoriasActivasInactivas();
@@ -461,7 +449,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 12) TotalPiezasInventario (sin parámetros)
   ipcMain.handle('stats-getTotalPiezasInventario', async () => {
     try {
       return await StatsService.getTotalPiezasInventario();
@@ -472,7 +459,6 @@ export function setupIpcHandlers() {
   });
 
   // ========== HISTORIAL DE VENTAS ==========
-  // (a) Traer TODAS las ventas
   ipcMain.handle('historial-getAllVentas', async () => {
     try {
       return await HistorialVentasService.getAllVentas();
@@ -482,7 +468,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (b) Traer detalles de una venta específica
   ipcMain.handle('historial-getDetallesByVentaId', async (_event, ventaId: number) => {
     try {
       return await HistorialVentasService.getDetallesByVentaId(ventaId);
@@ -492,7 +477,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (c) Filtrar ventas por rango (day, week, month, all)
   ipcMain.handle(
     'historial-getVentasByRange',
     async (_event, range: 'day' | 'week' | 'month' | 'all') => {
@@ -506,7 +490,6 @@ export function setupIpcHandlers() {
   );
 
   // ========== DASHBOARD (NUEVO) ==========
-  // 1) Obtener métricas principales
   ipcMain.handle('dashboard-getMetrics', async () => {
     try {
       return dashboardService.getMetrics();
@@ -516,7 +499,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 2) Obtener resumen de compras
   ipcMain.handle('dashboard-getResumenCompras', async () => {
     try {
       return dashboardService.getResumenCompras();
@@ -526,7 +508,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 3) Top productos por precio
   ipcMain.handle('dashboard-getTopProductosPorPrecio', async (_event, limit?: number) => {
     try {
       return dashboardService.getTopProductosPorPrecio(limit || 5);
@@ -536,7 +517,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 4) Margen de Ganancia (Básico)
   ipcMain.handle('dashboard-getMargenBasico', async () => {
     try {
       return dashboardService.getMargenBasico();
@@ -546,7 +526,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 5) Últimas Ventas
   ipcMain.handle('dashboard-getUltimasVentas', async (_event, limit?: number) => {
     try {
       return dashboardService.getUltimasVentas(limit || 5);
@@ -556,7 +535,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 6) Últimas Compras
   ipcMain.handle('dashboard-getUltimasCompras', async (_event, limit?: number) => {
     try {
       return dashboardService.getUltimasCompras(limit || 5);
@@ -566,7 +544,6 @@ export function setupIpcHandlers() {
     }
   });
 
-  // 7) Productos con Bajo Stock
   ipcMain.handle(
     'dashboard-getProductosBajoStock',
     async (_event, threshold?: number, limit?: number) => {
@@ -579,7 +556,6 @@ export function setupIpcHandlers() {
     }
   );
 
-  // 8) Lotes Próximos a Vencer
   ipcMain.handle(
     'dashboard-getLotesProxVencimiento',
     async (_event, days?: number, limit?: number) => {
@@ -588,6 +564,123 @@ export function setupIpcHandlers() {
       } catch (error) {
         console.error('Error dashboard-getLotesProxVencimiento:', error);
         return [];
+      }
+    }
+  );
+
+  // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
+  ipcMain.handle(
+    'ventasStats-getTotalVentas',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getTotalVentas(fechaInicio || '', fechaFin || '');
+      } catch (error) {
+        console.error('Error ventasStats-getTotalVentas:', error);
+        return 0;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getNumVentas',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getNumVentas(fechaInicio || '', fechaFin || '');
+      } catch (error) {
+        console.error('Error ventasStats-getNumVentas:', error);
+        return 0;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getProductosMasVendidos',
+    async (_event, fechaInicio?: string, fechaFin?: string, limit?: number) => {
+      try {
+        return VentasEstadisticasService.getProductosMasVendidos(
+          fechaInicio || '',
+          fechaFin || '',
+          limit || 5
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getProductosMasVendidos:', error);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getProductosMenosVendidos',
+    async (_event, fechaInicio?: string, fechaFin?: string, limit?: number) => {
+      try {
+        return VentasEstadisticasService.getProductosMenosVendidos(
+          fechaInicio || '',
+          fechaFin || '',
+          limit || 5
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getProductosMenosVendidos:', error);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getVentasPorCategoria',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getVentasPorCategoria(
+          fechaInicio || '',
+          fechaFin || ''
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getVentasPorCategoria:', error);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getVentasPorDia',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getVentasPorDia(
+          fechaInicio || '',
+          fechaFin || ''
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getVentasPorDia:', error);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getTicketPromedio',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getTicketPromedio(
+          fechaInicio || '',
+          fechaFin || ''
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getTicketPromedio:', error);
+        return 0;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'ventasStats-getGananciaBruta',
+    async (_event, fechaInicio?: string, fechaFin?: string) => {
+      try {
+        return VentasEstadisticasService.getGananciaBruta(
+          fechaInicio || '',
+          fechaFin || ''
+        );
+      } catch (error) {
+        console.error('Error ventasStats-getGananciaBruta:', error);
+        return 0;
       }
     }
   );

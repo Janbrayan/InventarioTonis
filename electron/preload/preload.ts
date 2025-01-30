@@ -215,4 +215,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('dashboard-getProductosBajoStock', threshold, limit),
   dashboardGetLotesProxVencimiento: (days?: number, limit?: number) =>
     ipcRenderer.invoke('dashboard-getLotesProxVencimiento', days, limit),
+
+  // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
+  ventasStatsGetTotalVentas: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getTotalVentas', fechaInicio, fechaFin),
+  ventasStatsGetNumVentas: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getNumVentas', fechaInicio, fechaFin),
+  ventasStatsGetProductosMasVendidos: (fechaInicio?: string, fechaFin?: string, limit?: number) =>
+    ipcRenderer.invoke('ventasStats-getProductosMasVendidos', fechaInicio, fechaFin, limit),
+  ventasStatsGetProductosMenosVendidos: (fechaInicio?: string, fechaFin?: string, limit?: number) =>
+    ipcRenderer.invoke('ventasStats-getProductosMenosVendidos', fechaInicio, fechaFin, limit),
+  ventasStatsGetVentasPorCategoria: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getVentasPorCategoria', fechaInicio, fechaFin),
+  ventasStatsGetVentasPorDia: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getVentasPorDia', fechaInicio, fechaFin),
+  ventasStatsGetTicketPromedio: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getTicketPromedio', fechaInicio, fechaFin),
+  ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) =>
+    ipcRenderer.invoke('ventasStats-getGananciaBruta', fechaInicio, fechaFin),
 });

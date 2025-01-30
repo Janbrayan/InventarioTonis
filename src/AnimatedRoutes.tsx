@@ -14,6 +14,7 @@ import Compras from './components/Compras';
 import Ventas from './components/Ventas';
 import Estadisticas from './components/Estadisticas';
 import HistorialVentas from './components/HistorialVentas';
+import EstadisticasVentas from './components/EstadisticasVentas';
 
 // tus placeholders...
 // GestionProductos, Categorias, etc.
@@ -80,7 +81,7 @@ export default function AppRoutes() {
               {/* ... */}
               <Route path='registro' element={<Ventas/>}/>
               <Route path='historial' element={<HistorialVentas/>}/>
-              <Route path='estadisticas'/>
+              <Route path='estadisticas' element={<EstadisticasVentas/>}/>
             </Route>
 
             {/* Reportes */}

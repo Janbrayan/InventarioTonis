@@ -1,3 +1,6 @@
+/** global.d.ts */
+// Se requiere este export vacío para que TypeScript reconozca
+// que esto es un módulo y podamos usar "declare global".
 export {};
 
 declare global {
@@ -78,7 +81,6 @@ declare global {
       }) => Promise<{ success: boolean }>;
 
       // ========== ESTADÍSTICAS ==========
-
       // 1) Total de compras
       statsGetTotalComprasPorFecha: (
         fechaInicio?: string,
@@ -175,7 +177,8 @@ declare global {
         totalPiezas: number;
       }>;
 
-      // ========== HISTORIAL VENTAS (opcional) ==========
+      // ========== HISTORIAL VENTAS ==========
+
       historialGetAllVentas?: () => Promise<any>;
       historialGetDetallesByVentaId?: (ventaId: number) => Promise<any>;
       historialGetVentasByRange?: (
@@ -183,7 +186,7 @@ declare global {
       ) => Promise<any>;
 
       // ========== DASHBOARD ==========
-      /** Obtiene métricas principales (totalProductos, totalVentas, etc.) */
+      /** Obtiene métricas principales (totalProductos, totalProveedores, etc.) */
       dashboardGetMetrics: () => Promise<{
         totalProductos: number;
         totalProveedores: number;
@@ -268,6 +271,53 @@ declare global {
           updatedAt: string;
         }>
       >;
+
+      // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
+      ventasStatsGetTotalVentas: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+      ventasStatsGetNumVentas: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+      ventasStatsGetProductosMasVendidos: (
+        fechaInicio?: string,
+        fechaFin?: string,
+        limit?: number
+      ) => Promise<
+        Array<{
+          productoId: number;
+          productName: string;
+          cantidadVendida: number;
+        }>
+      >;
+      ventasStatsGetProductosMenosVendidos: (
+        fechaInicio?: string,
+        fechaFin?: string,
+        limit?: number
+      ) => Promise<
+        Array<{
+          productoId: number;
+          productName: string;
+          cantidadVendida: number;
+        }>
+      >;
+      ventasStatsGetVentasPorCategoria: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<
+        Array<{
+          categoriaId: number;
+          categoriaNombre: string;
+          totalCategoria: number;
+        }>
+      >;
+      ventasStatsGetVentasPorDia: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<
+        Array<{
+          dia: string;
+          totalDia: number;
+        }>
+      >;
+      ventasStatsGetTicketPromedio: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+      ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
     }
   }
 }

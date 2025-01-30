@@ -125,22 +125,25 @@ export class HistorialVentasService {
     try {
       const rows = db.prepare(`
         SELECT
-          id,
-          ventaId,
-          productoId,
-          cantidad,
-          precioUnitario,
-          subtotal,
-          createdAt,
-          updatedAt
-        FROM detail_ventas
-        WHERE ventaId = ?
+          dv.id,
+          dv.ventaId,
+          dv.productoId,
+          p.nombre AS productName,
+          dv.cantidad,
+          dv.precioUnitario,
+          dv.subtotal,
+          dv.createdAt,
+          dv.updatedAt
+        FROM detail_ventas dv
+        JOIN products p ON p.id = dv.productoId
+        WHERE dv.ventaId = ?
       `).all(ventaId);
-
+  
       return rows.map((r: any) => ({
         id: r.id,
         ventaId: r.ventaId,
         productoId: r.productoId,
+        productName: r.productName,  // <-- Aquí
         cantidad: r.cantidad,
         precioUnitario: r.precioUnitario,
         subtotal: r.subtotal,
@@ -152,4 +155,5 @@ export class HistorialVentasService {
       return [];
     }
   }
+  
 }

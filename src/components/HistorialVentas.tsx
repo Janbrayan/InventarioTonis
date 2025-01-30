@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 
-// Tipos básicos
+/** ================== Tipos ================== */
 interface HistorialVenta {
   id?: number;
   fecha?: string;
@@ -36,10 +36,12 @@ interface HistorialVenta {
   updatedAt?: string;
 }
 
+/** Agregamos el campo productName para mostrar el nombre en lugar del ID */
 interface DetalleHistorialVenta {
   id?: number;
   ventaId?: number;
   productoId: number;
+  productName?: string;  // <-- nuevo campo para mostrar el nombre
   cantidad: number;
   precioUnitario: number;
   subtotal?: number;
@@ -57,7 +59,7 @@ function TablaDetallesVenta({ detalles }: { detalles: DetalleHistorialVenta[] })
         <TableHead>
           <TableRow>
             <TableCell>ID</TableCell>
-            <TableCell>ProductoID</TableCell>
+            <TableCell>Producto</TableCell>  {/* Antes "ProductoID" */}
             <TableCell>Cantidad</TableCell>
             <TableCell>PrecioUnit</TableCell>
             <TableCell>Subtotal</TableCell>
@@ -68,7 +70,8 @@ function TablaDetallesVenta({ detalles }: { detalles: DetalleHistorialVenta[] })
           {detalles.map((d) => (
             <TableRow key={d.id}>
               <TableCell>{d.id}</TableCell>
-              <TableCell>{d.productoId}</TableCell>
+              {/* Mostramos 'd.productName' en vez de 'd.productoId' */}
+              <TableCell>{d.productName || `ID=${d.productoId}`}</TableCell>
               <TableCell>{d.cantidad}</TableCell>
               <TableCell>{`$${d.precioUnitario.toFixed(2)}`}</TableCell>
               <TableCell>
@@ -92,6 +95,7 @@ function TablaDetallesVenta({ detalles }: { detalles: DetalleHistorialVenta[] })
   );
 }
 
+/** ================== Componente principal ================== */
 export default function HistorialVentas() {
   const [loading, setLoading] = useState(true);
   const [ventas, setVentas] = useState<HistorialVenta[]>([]);
