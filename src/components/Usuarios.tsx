@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
-/** Reutilizable para confirmaciones con un modal */
+/** ======== Diálogo de confirmación genérico ======== */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -53,7 +53,34 @@ function ConfirmDialog({
   );
 }
 
-/** Interfaz de usuario */
+/** ======== Diálogo de alerta con un botón (reemplaza alert) ======== */
+interface AlertDialogProps {
+  open: boolean;
+  message: string;
+  onClose: () => void;
+}
+function AlertDialog({ open, message, onClose }: AlertDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Alerta</DialogTitle>
+      <DialogContent>
+        <Typography>{message}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button variant="contained" onClick={onClose} autoFocus>
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** ======== Interfaz de usuario ======== */
 interface User {
   id: number;
   username: string;
@@ -61,7 +88,7 @@ interface User {
   activo: boolean; // true=activo, false=inactivo
 }
 
-/** Componente principal */
+/** ======== Componente principal ======== */
 export default function Usuarios() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +114,21 @@ export default function Usuarios() {
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Cargar usuarios al montar
+  // Alert (reemplaza alert() nativo)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+
+  /** Helpers para mostrar/cerrar alertas */
+  function openAlert(msg: string) {
+    setAlertMessage(msg);
+    setAlertOpen(true);
+  }
+  function closeAlert() {
+    setAlertOpen(false);
+    setAlertMessage('');
+  }
+
+  // ================== Cargar usuarios al montar ==================
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -96,6 +137,7 @@ export default function Usuarios() {
     try {
       if (!window.electronAPI) return;
       const userList = await window.electronAPI.getUsers();
+      // Ajustamos userList según tu BD (si maneja "activo" o no)
       // Forzamos "activo=true" si tu BD no lo maneja
       const mapped = (userList || []).map((u: any) => ({
         ...u,
@@ -104,12 +146,13 @@ export default function Usuarios() {
       setUsers(mapped);
     } catch (err) {
       console.error('Error fetching users:', err);
+      openAlert('No se pudieron cargar los usuarios.');
     } finally {
       setLoading(false);
     }
   }
 
-  // Crear
+  // ================== Crear ==================
   function handleOpenCreate() {
     setEditingUser(null);
     setUsername('');
@@ -118,7 +161,7 @@ export default function Usuarios() {
     setOpenModal(true);
   }
 
-  // Editar
+  // ================== Editar ==================
   function handleOpenEdit(user: User) {
     setEditingUser(user);
     setUsername(user.username);
@@ -127,7 +170,7 @@ export default function Usuarios() {
     setOpenModal(true);
   }
 
-  // Cerrar modal
+  // ================== Cerrar modal ==================
   function handleCloseModal() {
     setOpenModal(false);
     setEditingUser(null);
@@ -136,7 +179,7 @@ export default function Usuarios() {
     setActivo(true);
   }
 
-  // Abre confirm
+  // ================== Confirm Dialog Helpers ==================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -147,7 +190,7 @@ export default function Usuarios() {
     setConfirmOpen(false);
   }
 
-  // Guardar (crear o editar)
+  // ================== Guardar (crear o editar) ==================
   async function handleSaveUser() {
     setOpenModal(false); // cerrar modal de edición
 
@@ -159,31 +202,38 @@ export default function Usuarios() {
         try {
           if (!window.electronAPI) return;
 
+          if (!username.trim()) {
+            openAlert('El nombre de usuario es obligatorio.');
+            return;
+          }
+
           if (!editingUser) {
             // Crear
             const result = await window.electronAPI.createUser({
               username,
-              role
-              // si quieres manejar "activo" en BD, agrégalo
+              role,
+              // si quieres manejar "activo" en DB:
+              activo
             });
             if (!result?.success) {
-              alert('No se pudo crear el usuario.');
+              openAlert('No se pudo crear el usuario.');
             }
           } else {
             // Editar
             const result = await window.electronAPI.updateUser({
               id: editingUser.id,
               username,
-              role
-              // si quieres manejar "activo" en BD, agrégalo
+              role,
+              activo
             });
             if (!result?.success) {
-              alert('No se pudo actualizar el usuario.');
+              openAlert('No se pudo actualizar el usuario.');
             }
           }
           await fetchUsers();
         } catch (error) {
           console.error('Error guardando usuario:', error);
+          openAlert('Error de comunicación al guardar el usuario.');
         } finally {
           closeConfirmDialog();
         }
@@ -191,11 +241,11 @@ export default function Usuarios() {
     );
   }
 
-  // Eliminar
+  // ================== Eliminar ==================
   function handleDeleteUser(user: User) {
     // Evitar que un admin se elimine a sí mismo
     if (user.id === currentUser.id && currentUser.role === 'admin') {
-      alert('No puedes eliminar tu propia cuenta si eres administrador.');
+      openAlert('No puedes eliminar tu propia cuenta si eres administrador.');
       return;
     }
 
@@ -207,11 +257,12 @@ export default function Usuarios() {
           if (!window.electronAPI) return;
           const result = await window.electronAPI.deleteUser(user.id);
           if (!result?.success) {
-            alert('No se pudo eliminar el usuario.');
+            openAlert('No se pudo eliminar el usuario.');
           }
           await fetchUsers();
         } catch (error) {
           console.error('Error eliminando usuario:', error);
+          openAlert('Error de comunicación al eliminar el usuario.');
         } finally {
           closeConfirmDialog();
         }
@@ -219,6 +270,7 @@ export default function Usuarios() {
     );
   }
 
+  // ================== Render principal ==================
   if (loading) {
     return (
       <Box sx={{ p: 3 }}>
@@ -365,6 +417,13 @@ export default function Usuarios() {
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+      />
+
+      {/* Diálogo de alerta (reemplaza alert) */}
+      <AlertDialog
+        open={alertOpen}
+        message={alertMessage}
+        onClose={closeAlert}
       />
     </Box>
   );

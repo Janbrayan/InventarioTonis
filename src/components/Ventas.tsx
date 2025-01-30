@@ -149,7 +149,8 @@ function getStockColor(stock: number): 'error' | 'warning' | 'success' {
 /** Convierte un número a letras en español (versión resumida) */
 function numberToSpanish(num: number): string {
   if (num === 0) return 'cero';
-  // ... resto de tu lógica ...
+  // Aquí iría tu lógica más completa para convertir un número a texto en español.
+  // Ejemplo simplificado:
   return String(num);
 }
 
@@ -189,7 +190,7 @@ export default function Ventas() {
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
-  // Alert helpers
+  /** ============== Alert helpers ============== */
   function openAlert(message: string) {
     setAlertMessage(message);
     setAlertOpen(true);
@@ -199,7 +200,7 @@ export default function Ventas() {
     setAlertMessage('');
   }
 
-  // ===================== Cargar data (ventas, productos) =====================
+  /** ============== Cargar datos (ventas y productos) ============== */
   useEffect(() => {
     fetchAll();
   }, []);
@@ -221,7 +222,10 @@ export default function Ventas() {
     }
   }
 
-  // ===================== Efecto A: pendingProductId => openModal: 'createSale' =====================
+  /**
+   * Efecto A: si el estado `pendingProductId` viene en location, lo transformamos en
+   * un `state` con `openModal: 'createSale'`.
+   */
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -237,7 +241,9 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate]);
 
-  // ===================== Efecto B: openModal: 'createSale' => Abrir modal y agregar producto
+  /**
+   * Efecto B: si `openModal: 'createSale'` y hay un `productId`, abrimos el modal y agregamos producto
+   */
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -253,9 +259,9 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate, openModal]);
 
-  // ===================== Abrir/cerrar modal Crear Venta =====================
+  /** ============== Abrir/cerrar modal de crear venta ============== */
   function handleOpenCreate() {
-    // Resetear la venta si gustas:
+    // Puedes resetear la venta, si gustas
     // setDetalles([]);
     setPagoStr('');
     setCambio(0);
@@ -265,42 +271,37 @@ export default function Ventas() {
     setOpenModal(false);
   }
 
-  // ===================== Seleccionar producto manualmente =====================
+  /** ============== Seleccionar producto manualmente ============== */
   function handleChangeProducto(e: SelectChangeEvent<number>) {
     const newProdId = Number(e.target.value);
-
-    // Si el stock es 0 => mostramos alerta y no añadimos
     if (newProdId) {
       const foundProd = products.find((p) => p.id === newProdId);
       if (foundProd && (foundProd.stock ?? 0) <= 0) {
         openAlert('Debes agregar stock a este producto antes de venderlo.');
-        return; 
+        return;
       }
     }
     setSelProductoId(newProdId);
     if (!newProdId) return;
-
     addProductById(newProdId);
     setSelProductoId(0);
   }
 
-  // ===================== Agregar producto al carrito =====================
+  /** ============== Agregar producto al carrito ============== */
   function addProductById(productId: number) {
     const index = detalles.findIndex((r) => r.productoId === productId);
     if (index >= 0) {
-      // Ya existe => incrementar la cantidad
+      // Ya existe => incrementar cantidad
       const copy = [...detalles];
       const row = copy[index];
-
       row.cantidad += 1;
       row.cantidadStr = String(row.cantidad);
       row.subtotal = row.cantidad * row.precioUnitario;
       setDetalles(copy);
-
     } else {
+      // Nuevo renglón
       const prod = products.find((p) => p.id === productId);
       if (!prod) return;
-
       const precio = prod.precioVenta ?? 0;
       const nuevo: DetalleVenta = {
         productoId: productId,
@@ -314,23 +315,23 @@ export default function Ventas() {
     }
   }
 
-  // ===================== Eliminar renglón =====================
+  /** ============== Eliminar renglón del carrito ============== */
   function removeRenglonDetalle(idx: number) {
     const copy = [...detalles];
     copy.splice(idx, 1);
     setDetalles(copy);
   }
 
-  // ===================== Cambiar cantidad/precio (usamos strings) =====================
+  /** ============== Manejar cambio de cantidad ============== */
   function handleChangeCantidad(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
   ) {
     const inputValue = e.target.value;
     const copy = [...detalles];
     const row = copy[idx];
 
-    row.cantidadStr = inputValue; // guardo la cadena tecleada
+    row.cantidadStr = inputValue;
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
       row.cantidad = parsed;
@@ -339,8 +340,9 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
+  /** ============== Manejar cambio de precio unitario ============== */
   function handleChangePrecio(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
   ) {
     const inputValue = e.target.value;
@@ -356,12 +358,12 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  // ===================== Calcular total =====================
+  /** ============== Calcular total de la venta ============== */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
 
-  // ===================== Pago/cambio =====================
+  /** ============== Pago/cambio ============== */
   function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const pagoNum = parseFloat(e.target.value) || 0;
     setPagoStr(e.target.value);
@@ -370,12 +372,11 @@ export default function Ventas() {
     setCambio(c > 0 ? c : 0);
   }
 
-  // ===================== Guardar Venta =====================
+  /** ============== Guardar Venta ============== */
   async function handleSaveVenta() {
     const action = async () => {
       try {
         const total = calcularTotal();
-        // Mandamos la versión numérica (cantidad, precioUnitario) al backend
         const saleData = {
           total,
           detalles: detalles.map((d) => ({
@@ -410,7 +411,7 @@ export default function Ventas() {
     setOpenModal(false);
   }
 
-  // ===================== Confirm Dialog =====================
+  /** ============== Confirm Dialog Helpers ============== */
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -421,7 +422,7 @@ export default function Ventas() {
     setConfirmOpen(false);
   }
 
-  // ===================== Ver Detalles de Venta existente =====================
+  /** ============== Ver Detalles de Venta existente ============== */
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -439,7 +440,7 @@ export default function Ventas() {
     setViewVentaId(null);
   }
 
-  // ===================== Eliminar venta =====================
+  /** ============== Eliminar venta ============== */
   function handleDeleteVenta(v: Sale) {
     openConfirmDialog(
       'Eliminar Venta',
@@ -463,10 +464,9 @@ export default function Ventas() {
     );
   }
 
-  // ===================== Render =====================
+  /** ============== Render principal ============== */
   if (loading) return <p>Cargando ventas...</p>;
 
-  // Calcular total y cambio
   const total = calcularTotal();
   const pagoNum = parseFloat(pagoStr) || 0;
   const cambioNum = pagoNum > total ? (pagoNum - total) : 0;
@@ -552,7 +552,7 @@ export default function Ventas() {
         </CardContent>
       </Card>
 
-      {/* Modal Crear Venta */}
+      {/* ================== Modal Crear Venta ================== */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
@@ -603,7 +603,7 @@ export default function Ventas() {
             </Select>
           </FormControl>
 
-          {/* Tabla interna de renglones */}
+          {/* Tabla interna de renglones (carrito) */}
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
@@ -624,7 +624,6 @@ export default function Ventas() {
                       <TableCell>{nombreProd}</TableCell>
                       <TableCell>
                         <TextField
-                          // type="text" para permitir cualquier input
                           type="text"
                           value={d.cantidadStr}
                           onChange={(e) => handleChangeCantidad(e, idx)}
@@ -696,7 +695,7 @@ export default function Ventas() {
         </DialogActions>
       </Dialog>
 
-      {/* Modal Ver Detalles de Venta */}
+      {/* ============== Modal Ver Detalles de Venta ============== */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}
@@ -757,7 +756,7 @@ export default function Ventas() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm Dialog */}
+      {/* ============== Confirm Dialog ============== */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
@@ -766,7 +765,7 @@ export default function Ventas() {
         onConfirm={confirmAction}
       />
 
-      {/* Alert Dialog */}
+      {/* ============== Alert Dialog ============== */}
       <AlertDialog
         open={alertOpen}
         message={alertMessage}

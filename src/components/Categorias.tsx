@@ -21,9 +21,13 @@ import {
   Switch,
   FormControlLabel
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
 
-/** Interfaz de Categoría; ajústala si necesitas más campos */
+/** ====================== Interfaz de Categoría ====================== */
 interface Category {
   id?: number;
   nombre: string;
@@ -31,7 +35,7 @@ interface Category {
   updatedAt?: string;
 }
 
-/** Props del Diálogo de Confirmación Genérico */
+/** ====================== ConfirmDialogProps ====================== */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -40,7 +44,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
-/** Componente de Diálogo de Confirmación */
+/** ====================== Diálogo de confirmación ====================== */
 function ConfirmDialog({
   open,
   title,
@@ -54,11 +58,7 @@ function ConfirmDialog({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      BackdropProps={{
-        style: {
-          backdropFilter: 'blur(6px)'
-        }
-      }}
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
@@ -72,6 +72,36 @@ function ConfirmDialog({
   );
 }
 
+/** ====================== AlertDialog (un solo botón) ====================== */
+interface AlertDialogProps {
+  open: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function AlertDialog({ open, message, onClose }: AlertDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Alerta</DialogTitle>
+      <DialogContent>
+        <Typography>{message}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained" autoFocus>
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** ====================== Componente principal ====================== */
 export default function Categorias() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,13 +114,27 @@ export default function Categorias() {
   const [nombre, setNombre] = useState('');
   const [activo, setActivo] = useState(true);
 
-  // Diálogo de confirmación
+  // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Cargar categorías al montar
+  // Alert Dialog
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+
+  /** ====== Helpers para AlertDialog ====== */
+  function openAlert(message: string) {
+    setAlertMessage(message);
+    setAlertOpen(true);
+  }
+  function closeAlert() {
+    setAlertOpen(false);
+    setAlertMessage('');
+  }
+
+  // ====================== Cargar categorías al montar ======================
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -103,12 +147,13 @@ export default function Categorias() {
       setCategories(resp || []);
     } catch (error) {
       console.error('Error al obtener categorías:', error);
+      openAlert('No se pudo cargar la lista de categorías.');
     } finally {
       setLoading(false);
     }
   }
 
-  // ========== MANEJO DEL MODAL CREAR/EDITAR ==========
+  // ====================== MANEJO DEL MODAL CREAR/EDITAR ======================
   function handleOpenCreate() {
     setEditingCat(null);
     setNombre('');
@@ -128,7 +173,7 @@ export default function Categorias() {
     setEditingCat(null);
   }
 
-  // ========== DIÁLOGO DE CONFIRMACIÓN ==========
+  // ====================== CONFIRM DIALOG UTILS ======================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -139,9 +184,11 @@ export default function Categorias() {
     setConfirmOpen(false);
   }
 
-  // ========== GUARDAR (CREAR O EDITAR) ==========
+  // ====================== GUARDAR (CREAR O EDITAR) ======================
   async function handleSaveCategory() {
+    // Cerramos modal antes de la confirm
     setOpenModal(false);
+
     const isEdit = !!editingCat;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
@@ -152,6 +199,11 @@ export default function Categorias() {
         try {
           if (!window.electronAPI) return;
 
+          if (!nombre.trim()) {
+            openAlert('El nombre de la categoría es obligatorio.');
+            return;
+          }
+
           if (!isEdit) {
             // Crear
             const result = await window.electronAPI.createCategory({
@@ -159,7 +211,7 @@ export default function Categorias() {
               activo
             });
             if (!result?.success) {
-              alert('No se pudo crear la categoría.');
+              openAlert('No se pudo crear la categoría.');
             }
           } else {
             // Editar
@@ -169,12 +221,14 @@ export default function Categorias() {
               activo
             });
             if (!result?.success) {
-              alert('No se pudo actualizar la categoría.');
+              openAlert('No se pudo actualizar la categoría.');
             }
           }
+
           await fetchCategories();
         } catch (err) {
           console.error('Error guardando categoría:', err);
+          openAlert('Error de comunicación al guardar la categoría.');
         } finally {
           closeConfirmDialog();
         }
@@ -182,7 +236,7 @@ export default function Categorias() {
     );
   }
 
-  // ========== ELIMINAR ==========
+  // ====================== ELIMINAR ======================
   function handleDeleteCategory(cat: Category) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -192,11 +246,12 @@ export default function Categorias() {
           if (!window.electronAPI) return;
           const resp = await window.electronAPI.deleteCategory(cat.id!);
           if (!resp?.success) {
-            alert('No se pudo eliminar la categoría.');
+            openAlert('No se pudo eliminar la categoría.');
           }
           await fetchCategories();
         } catch (err) {
           console.error('Error eliminando categoría:', err);
+          openAlert('Error de comunicación al eliminar la categoría.');
         } finally {
           closeConfirmDialog();
         }
@@ -204,7 +259,7 @@ export default function Categorias() {
     );
   }
 
-  // Render principal
+  // ====================== Render principal ======================
   if (loading) {
     return <p>Cargando categorías...</p>;
   }
@@ -319,17 +374,13 @@ export default function Categorias() {
         </CardContent>
       </Card>
 
-      {/* Modal Crear/Editar Categoría */}
+      {/* ============== Modal Crear/Editar Categoría ============== */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
         fullWidth
         maxWidth="sm"
-        BackdropProps={{
-          style: {
-            backdropFilter: 'blur(6px)'
-          }
-        }}
+        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           {editingCat ? 'Editar Categoría' : 'Crear Categoría'}
@@ -337,7 +388,6 @@ export default function Categorias() {
         <DialogContent sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             label="Nombre"
-            // type="text" deja teclear libremente
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
@@ -363,13 +413,20 @@ export default function Categorias() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de confirmación */}
+      {/* ============== Diálogo de confirmación ============== */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+      />
+
+      {/* ============== Diálogo de alerta general ============== */}
+      <AlertDialog
+        open={alertOpen}
+        message={alertMessage}
+        onClose={closeAlert}
       />
     </Box>
   );

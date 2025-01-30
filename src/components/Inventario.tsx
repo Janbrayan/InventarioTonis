@@ -33,7 +33,7 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon
 } from '@mui/icons-material';
 
-/** Estructura devuelta por getInventoryGrouped() */
+/** ==================== Tipos y estructuras ==================== */
 interface InventoryGroup {
   product: {
     id: number;
@@ -44,7 +44,6 @@ interface InventoryGroup {
   totalPiezas: number;
 }
 
-/** Producto básico para el <Select> */
 interface Product {
   id: number;
   nombre: string;
@@ -70,7 +69,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
-/** Diálogo de confirmación genérico */
+/** =============== Diálogo de confirmación genérico =============== */
 function ConfirmDialog({
   open,
   title,
@@ -84,9 +83,7 @@ function ConfirmDialog({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      BackdropProps={{
-        style: { backdropFilter: 'blur(6px)' }
-      }}
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
@@ -102,9 +99,38 @@ function ConfirmDialog({
   );
 }
 
+/** =============== Diálogo de error (reemplaza alert) =============== */
+interface ErrorDialogProps {
+  open: boolean;
+  errorMessage: string;
+  onClose: () => void;
+}
+
+function ErrorDialog({ open, errorMessage, onClose }: ErrorDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Error</DialogTitle>
+      <DialogContent>
+        <Typography>{errorMessage}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /**
  * Determina el estado de stock en función del total de piezas.
- * Ajusta los límites a tu gusto (por ejemplo <5, <15, etc.).
+ * Ajusta los límites a tu gusto (<5, <15, etc.).
  */
 function getStockStatus(totalPiezas: number) {
   if (totalPiezas === 0) {
@@ -118,7 +144,7 @@ function getStockStatus(totalPiezas: number) {
   }
 }
 
-/** Componente principal */
+/** ==================== Componente principal ==================== */
 export default function Inventario() {
   // Lista agrupada proveniente del backend
   const [inventory, setInventory] = useState<InventoryGroup[]>([]);
@@ -127,20 +153,19 @@ export default function Inventario() {
   const [loading, setLoading] = useState(true);
 
   // =========================
-  //     Modal Crear/Editar Lote
+  //  Modal Crear/Editar Lote
   // =========================
   const [openModal, setOpenModal] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
 
-  // En lugar de usar number directo, manejaremos strings para cantidadActual
-  // y convertimos a número al guardar.
   const [productoId, setProductoId] = useState<number>(0);
   const [lote, setLote] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
-  const [cantidadStr, setCantidadStr] = useState(''); // Usamos string para evitar bloqueos
+  // Cantidad manejada como string
+  const [cantidadStr, setCantidadStr] = useState('');
 
   // =========================
-  //     Confirm Dialog
+  //   Confirm Dialog
   // =========================
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
@@ -148,21 +173,25 @@ export default function Inventario() {
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
   // =========================
-  //     Expand/Collapse
+  //   Expand/Collapse
   // =========================
   const [openProductId, setOpenProductId] = useState<number | null>(null);
 
   // =========================
-  //     Descuento/Merma
+  //   Descuento/Merma
   // =========================
   const [descuentoOpen, setDescuentoOpen] = useState(false);
-  // También usaremos strings en los campos de descuento
   const [descuentoCantidadStr, setDescuentoCantidadStr] = useState('');
   const [descuentoMotivo, setDescuentoMotivo] = useState('');
   const [descuentoLote, setDescuentoLote] = useState<Lote | null>(null);
 
   // =========================
-  //     useEffect / Data
+  //   Diálogo de error general
+  // =========================
+  const [error, setError] = useState('');
+
+  // =========================
+  //    useEffect / Data
   // =========================
   useEffect(() => {
     fetchData();
@@ -171,8 +200,6 @@ export default function Inventario() {
   async function fetchData() {
     try {
       setLoading(true);
-      // 1) Obtenemos inventario agrupado
-      // 2) Obtenemos la lista completa de productos
       const [inv, prodList] = await Promise.all([
         window.electronAPI.getInventoryGrouped(),
         window.electronAPI.getProducts()
@@ -182,13 +209,14 @@ export default function Inventario() {
       setAllProducts(prodList || []);
     } catch (err) {
       console.error('Error fetchData Inventario:', err);
+      setError('No se pudo cargar el inventario y/o la lista de productos.');
     } finally {
       setLoading(false);
     }
   }
 
   // =========================
-  //     Crear / Editar Lote
+  //   Crear / Editar Lote
   // =========================
   function handleOpenCreate() {
     setEditingLote(null);
@@ -204,7 +232,6 @@ export default function Inventario() {
     setProductoId(l.productoId);
     setLote(l.lote ?? '');
     setFechaCaducidad(l.fechaCaducidad ?? '');
-    // Convertimos la cantidad a string
     const cant = l.cantidadActual ?? 0;
     setCantidadStr(String(cant));
     setOpenModal(true);
@@ -216,7 +243,9 @@ export default function Inventario() {
   }
 
   async function handleSaveLote() {
+    // Primero cerramos el modal
     setOpenModal(false);
+
     const isEdit = !!editingLote;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
@@ -226,8 +255,6 @@ export default function Inventario() {
       async () => {
         try {
           if (!window.electronAPI) return;
-
-          // Convierto el string a número con parseFloat
           const cant = parseFloat(cantidadStr) || 0;
 
           if (!isEdit) {
@@ -240,7 +267,7 @@ export default function Inventario() {
               activo: true
             });
             if (!resp?.success) {
-              alert('No se pudo crear el lote.');
+              setError('No se pudo crear el lote en la base de datos.');
             }
           } else {
             // Editar
@@ -253,12 +280,13 @@ export default function Inventario() {
               activo: true
             });
             if (!resp?.success) {
-              alert('No se pudo actualizar el lote.');
+              setError('No se pudo actualizar el lote en la base de datos.');
             }
           }
           await fetchData();
         } catch (err) {
           console.error('Error guardando lote:', err);
+          setError('Error de comunicación al guardar el lote.');
         } finally {
           closeConfirmDialog();
         }
@@ -267,7 +295,7 @@ export default function Inventario() {
   }
 
   // =========================
-  //     Eliminar (Soft-Delete)
+  //   Eliminar (Soft-Delete)
   // =========================
   function handleDeleteLote(l: Lote) {
     openConfirmDialog(
@@ -285,11 +313,12 @@ export default function Inventario() {
             activo: false
           });
           if (!resp?.success) {
-            alert('No se pudo desactivar el lote.');
+            setError('No se pudo desactivar el lote en la base de datos.');
           }
           await fetchData();
         } catch (err) {
           console.error('Error soft-deleting lote:', err);
+          setError('Error de comunicación al desactivar el lote.');
         } finally {
           closeConfirmDialog();
         }
@@ -298,7 +327,7 @@ export default function Inventario() {
   }
 
   // =========================
-  //     Descuento / Merma
+  //   Descuento / Merma
   // =========================
   function handleOpenDescuento(l: Lote) {
     setDescuentoLote(l);
@@ -317,10 +346,12 @@ export default function Inventario() {
   async function handleConfirmDescuento() {
     if (!descuentoLote) return;
     const cant = parseFloat(descuentoCantidadStr) || 0;
+
     if (cant <= 0) {
-      alert('La cantidad a descontar debe ser mayor a 0.');
+      setError('La cantidad a descontar debe ser mayor a 0.');
       return;
     }
+
     openConfirmDialog(
       'Confirmar Consumo/Merma',
       `¿Deseas descontar ${cant} unidades del Lote "${descuentoLote.lote}"?`,
@@ -333,11 +364,12 @@ export default function Inventario() {
             motivo: descuentoMotivo
           });
           if (!resp?.success) {
-            alert('No se pudo descontar.');
+            setError('No se pudo descontar el lote en la base de datos.');
           }
           await fetchData();
         } catch (err) {
           console.error('Error en descontarPorConsumo:', err);
+          setError('Error de comunicación al descontar.');
         } finally {
           closeConfirmDialog();
           handleCloseDescuento();
@@ -347,7 +379,7 @@ export default function Inventario() {
   }
 
   // =========================
-  //     Confirm Dialog Helpers
+  //   Confirm Dialog Helpers
   // =========================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
@@ -361,14 +393,21 @@ export default function Inventario() {
   }
 
   // =========================
-  //  Expandir / Colapsar filas
+  //   Expandir / Colapsar filas
   // =========================
   function toggleProductRow(prodId: number) {
-    setOpenProductId(prev => (prev === prodId ? null : prodId));
+    setOpenProductId((prev) => (prev === prodId ? null : prodId));
   }
 
   // =========================
-  //     RENDER
+  //   Cerrar diálogo de error
+  // =========================
+  function handleCloseError() {
+    setError('');
+  }
+
+  // =========================
+  //   Render principal
   // =========================
   if (loading) {
     return <p>Cargando inventario (agrupado)...</p>;
@@ -442,7 +481,10 @@ export default function Inventario() {
                   const isOpen = openProductId === product.id;
                   const infoExtra = `(${totalLotes} lotes, ${totalPiezas} piezas)`;
 
-                  const { label: stockLabel, color: stockColor } = getStockStatus(totalPiezas);
+                  const {
+                    label: stockLabel,
+                    color: stockColor
+                  } = getStockStatus(totalPiezas);
 
                   return (
                     <React.Fragment key={product.id}>
@@ -451,9 +493,7 @@ export default function Inventario() {
                         onClick={() => toggleProductRow(product.id)}
                         sx={{
                           cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.05)'
-                          }
+                          '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
                         }}
                       >
                         <TableCell sx={{ width: 50 }}>
@@ -485,7 +525,7 @@ export default function Inventario() {
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ color: '#fff' }}>
-                          {/* Podrías poner aquí algún botón extra si quieres */}
+                          {/* Botones adicionales si quieres */}
                         </TableCell>
                       </TableRow>
 
@@ -520,11 +560,7 @@ export default function Inventario() {
                                 <TableBody>
                                   {lotes.length === 0 ? (
                                     <TableRow>
-                                      <TableCell
-                                        colSpan={6}
-                                        sx={{ color: '#fff' }}
-                                        align="center"
-                                      >
+                                      <TableCell colSpan={6} sx={{ color: '#fff' }} align="center">
                                         Sin lotes para {product.nombre}
                                       </TableCell>
                                     </TableRow>
@@ -538,9 +574,7 @@ export default function Inventario() {
                                           }
                                         }}
                                       >
-                                        <TableCell sx={{ color: '#fff' }}>
-                                          {l.id}
-                                        </TableCell>
+                                        <TableCell sx={{ color: '#fff' }}>{l.id}</TableCell>
                                         <TableCell sx={{ color: '#fff' }}>
                                           {l.lote || '—'}
                                         </TableCell>
@@ -625,15 +659,13 @@ export default function Inventario() {
         </CardContent>
       </Card>
 
-      {/* Modal Crear/Editar Lote */}
+      {/* ================== Modal Crear/Editar Lote ================== */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
         fullWidth
         maxWidth="sm"
-        BackdropProps={{
-          style: { backdropFilter: 'blur(6px)' }
-        }}
+        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           {editingLote ? 'Editar Lote' : 'Crear Lote'}
@@ -678,7 +710,7 @@ export default function Inventario() {
             type="text"
             value={cantidadStr}
             onChange={(e) => {
-              // Filtramos: solo dígitos y punto (si lo deseas)
+              // Filtramos: solo dígitos y punto (si se requiere)
               const val = e.target.value.replace(/[^\d.]/g, '');
               setCantidadStr(val);
             }}
@@ -693,7 +725,7 @@ export default function Inventario() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de confirmación genérico */}
+      {/* ============ Diálogo de confirmación genérico ============ */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
@@ -702,17 +734,16 @@ export default function Inventario() {
         onConfirm={confirmAction}
       />
 
-      {/* Diálogo de Descuento / Merma */}
+      {/* ============ Diálogo de Descuento / Merma ============ */}
       <Dialog
         open={descuentoOpen}
         onClose={handleCloseDescuento}
         fullWidth
         maxWidth="xs"
+        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Descontar / Merma</DialogTitle>
-        <DialogContent
-          sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}
-        >
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <Typography variant="body2">
             Ingresa la cantidad a descontar (por consumo interno, merma, etc.)
             y un motivo opcional.
@@ -739,6 +770,13 @@ export default function Inventario() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ============ Diálogo de Error General ============ */}
+      <ErrorDialog
+        open={!!error}
+        errorMessage={error}
+        onClose={handleCloseError}
+      />
     </Box>
   );
 }

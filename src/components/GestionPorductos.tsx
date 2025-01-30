@@ -23,10 +23,14 @@ import {
   FormControl,
   InputLabel
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-// ====== Tipos locales ======
+/** ================== Tipos locales ================== */
 interface Category {
   id: number;
   nombre: string;
@@ -44,7 +48,7 @@ interface Product {
   updatedAt?: string;
 }
 
-/** Diálogo de confirmación genérico */
+/** =============== Diálogo de confirmación genérico =============== */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -66,11 +70,7 @@ function ConfirmDialog({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      BackdropProps={{
-        style: {
-          backdropFilter: 'blur(6px)'
-        }
-      }}
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
@@ -86,9 +86,35 @@ function ConfirmDialog({
   );
 }
 
-// ===============================
-//   Componente principal
-// ===============================
+/** =============== Diálogo de error (reemplaza alert) =============== */
+interface ErrorDialogProps {
+  open: boolean;
+  errorMessage: string;
+  onClose: () => void;
+}
+function ErrorDialog({ open, errorMessage, onClose }: ErrorDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Error</DialogTitle>
+      <DialogContent>
+        <Typography>{errorMessage}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** ================== Componente principal ================== */
 export default function GestionProductos() {
   const location = useLocation(); // Para leer location.state
   const navigate = useNavigate();
@@ -105,14 +131,12 @@ export default function GestionProductos() {
   const [nombre, setNombre] = useState('');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
 
-  // Almacena los valores del precio en strings; luego convertimos a número
+  // Almacena los valores del precio en strings
   const [precioCompraStr, setPrecioCompraStr] = useState('0');
   const [precioVentaStr, setPrecioVentaStr] = useState('0');
 
   const [codigoBarras, setCodigoBarras] = useState('');
-  // Si en tu lógica requieres un "activo" como checkbox/switch, puedes agregarlo
-  // (Actualmente no tienes un input para "activo" en el modal, pero puedes hacerlo)
-  const [activo] = useState(true);
+  const [activo] = useState(true); // si tuvieras un Switch/Checkbox, lo manejarías aquí
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -120,7 +144,10 @@ export default function GestionProductos() {
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Cargar datos al montar
+  // Estado de error general (para reemplazar alerts)
+  const [error, setError] = useState('');
+
+  // ================== Cargar datos al montar ==================
   useEffect(() => {
     fetchData();
   }, []);
@@ -128,6 +155,7 @@ export default function GestionProductos() {
   async function fetchData() {
     try {
       setLoading(true);
+      // Llamadas a tu backend / electronAPI
       const [prodList, catList] = await Promise.all([
         window.electronAPI.getProducts(),
         window.electronAPI.getCategories()
@@ -136,20 +164,19 @@ export default function GestionProductos() {
       setCategories(catList || []);
     } catch (error) {
       console.error('Error fetching products/categories:', error);
+      setError('No se pudieron cargar los productos/categorías.');
     } finally {
       setLoading(false);
     }
   }
 
-  // Efecto para abrir modal automáticamente según location.state
+  // Revisa si vienes de un escaneo => abrir modal de crear/editar
   useEffect(() => {
     const state: any = location.state;
     if (state?.createBarcode) {
       // QUIERO CREAR con barcode prellenado
       handleOpenCreate(state.createBarcode);
-
-      // Limpio location.state
-      navigate(location.pathname, { replace: true });
+      navigate(location.pathname, { replace: true }); // limpiar state
     } else if (state?.editBarcode) {
       // QUIERO EDITAR un producto ya existente
       const found = products.find(p => p.codigoBarras === state.editBarcode);
@@ -160,7 +187,7 @@ export default function GestionProductos() {
     }
   }, [location.state, navigate, products]);
 
-  // Abrir modal para crear (opcional: pasar un barcode)
+  // ================== Abrir modal para crear ==================
   function handleOpenCreate(barcode?: string) {
     setEditingProduct(null);
     setNombre('');
@@ -168,11 +195,11 @@ export default function GestionProductos() {
     setPrecioCompraStr('0');
     setPrecioVentaStr('0');
     setCodigoBarras(barcode ?? '');
-    // setActivo(true); // si tuvieras check activo, reinit
+    // setActivo(true); // si tuvieses un checkbox, reinit
     setOpenModal(true);
   }
 
-  // Abrir modal para editar
+  // ================== Abrir modal para editar ==================
   function handleOpenEdit(prod: Product) {
     setEditingProduct(prod);
     setNombre(prod.nombre);
@@ -189,7 +216,7 @@ export default function GestionProductos() {
     setEditingProduct(null);
   }
 
-  // confirm dialog
+  // ================== Confirm Dialog Helpers ==================
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -200,19 +227,21 @@ export default function GestionProductos() {
     setConfirmOpen(false);
   }
 
-  // Guardar (crear o editar)
+  // ================== Guardar (crear o editar) ==================
   async function handleSaveProduct() {
-    // 1) Convertimos los strings a números
+    // Convertimos los strings a números
     const pc = parseFloat(precioCompraStr) || 0;
     const pv = parseFloat(precioVentaStr) || 0;
 
-    // 2) Validaciones mínimas
+    // Validaciones mínimas
     if (!nombre.trim()) {
-      alert('El nombre de producto es obligatorio');
+      setError('El nombre de producto es obligatorio');
       return;
     }
 
+    // Cerrar modal para mostrar luego confirm
     setOpenModal(false);
+
     const isEdit = !!editingProduct;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
@@ -234,7 +263,7 @@ export default function GestionProductos() {
               activo
             });
             if (!resp?.success) {
-              alert('No se pudo crear el producto.');
+              setError('No se pudo crear el producto.');
             }
           } else {
             // Editar
@@ -248,13 +277,14 @@ export default function GestionProductos() {
               activo
             });
             if (!resp?.success) {
-              alert('No se pudo actualizar el producto.');
+              setError('No se pudo actualizar el producto.');
             }
           }
 
           await fetchData();
         } catch (err) {
           console.error('Error guardando producto:', err);
+          setError('Error de comunicación al guardar.');
         } finally {
           closeConfirmDialog();
         }
@@ -262,7 +292,7 @@ export default function GestionProductos() {
     );
   }
 
-  // Eliminar
+  // ================== Eliminar producto ==================
   function handleDeleteProduct(prod: Product) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -272,11 +302,12 @@ export default function GestionProductos() {
           if (!window.electronAPI) return;
           const resp = await window.electronAPI.deleteProduct(prod.id!);
           if (!resp?.success) {
-            alert('No se pudo eliminar el producto.');
+            setError('No se pudo eliminar el producto.');
           }
           await fetchData();
         } catch (err) {
           console.error('Error eliminando producto:', err);
+          setError('Error de comunicación al eliminar.');
         } finally {
           closeConfirmDialog();
         }
@@ -284,10 +315,16 @@ export default function GestionProductos() {
     );
   }
 
+  // Cierra el diálogo de error
+  function handleCloseError() {
+    setError('');
+  }
+
   if (loading) {
     return <p>Cargando productos...</p>;
   }
 
+  // ================== Render principal ==================
   return (
     <Box sx={{ p: 3, width: '100%' }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
@@ -304,7 +341,7 @@ export default function GestionProductos() {
           sx={{
             backgroundColor: '#343a40',
             borderRadius: '8px 8px 0 0',
-            pb: 1,
+            pb: 1
           }}
           action={
             <Button
@@ -319,7 +356,10 @@ export default function GestionProductos() {
           }
         />
         <CardContent sx={{ p: 0 }}>
-          <TableContainer component={Paper} sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}>
+          <TableContainer
+            component={Paper}
+            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+          >
             <Table>
               <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
                 <TableRow>
@@ -337,15 +377,14 @@ export default function GestionProductos() {
               <TableBody>
                 {products.map((prod) => {
                   // Obtener el nombre de la categoría, si existe
-                  const catName = categories.find(c => c.id === prod.categoriaId)?.nombre || '—';
+                  const catName =
+                    categories.find(c => c.id === prod.categoriaId)?.nombre || '—';
 
                   return (
                     <TableRow
                       key={prod.id}
                       sx={{
-                        '&:hover': {
-                          backgroundColor: 'rgba(255,255,255,0.05)'
-                        }
+                        '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
                       }}
                     >
                       <TableCell sx={{ color: '#fff' }}>{prod.id}</TableCell>
@@ -360,7 +399,12 @@ export default function GestionProductos() {
                       <TableCell sx={{ color: '#fff' }}>
                         {prod.codigoBarras || '—'}
                       </TableCell>
-                      <TableCell sx={{ color: prod.activo ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
+                      <TableCell
+                        sx={{
+                          color: prod.activo ? '#28a745' : '#dc3545',
+                          fontWeight: 'bold'
+                        }}
+                      >
                         {prod.activo ? 'Sí' : 'No'}
                       </TableCell>
                       <TableCell sx={{ color: '#fff' }}>
@@ -404,7 +448,7 @@ export default function GestionProductos() {
         </CardContent>
       </Card>
 
-      {/* Modal Crear/Editar Producto */}
+      {/* ============ Modal Crear/Editar Producto ============ */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
@@ -448,7 +492,7 @@ export default function GestionProductos() {
             type="text"
             value={precioCompraStr}
             onChange={(e) => {
-              // Filtra caracteres no deseados
+              // Filtramos caracteres no deseados
               const val = e.target.value.replace(/[^\d.]/g, '');
               setPrecioCompraStr(val);
             }}
@@ -481,13 +525,20 @@ export default function GestionProductos() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de confirmación */}
+      {/* ============ Diálogo de confirmación ============ */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+      />
+
+      {/* ============ Diálogo de error general ============ */}
+      <ErrorDialog
+        open={!!error}
+        errorMessage={error}
+        onClose={handleCloseError}
       />
     </Box>
   );

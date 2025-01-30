@@ -10,15 +10,20 @@ export default function Login() {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
 
-  // Para mostrar la alerta de "Cerrando sesión..."
+  // Manejo de Snackbar (Alert) unificado
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<'success'|'info'>('success');
+  /**
+   * Podemos manejar varios tipos de severidad:
+   * - 'error' para credenciales inválidas
+   * - 'info' para "Cerrando sesión..."
+   * - 'success' si lo requieres en otro caso
+   */
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'info'|'error'|'success'>('info');
 
   useEffect(() => {
-    // Detecta si venimos con fromLogout
+    // Detecta si venimos de un logout
     if (location.state?.fromLogout) {
       setSnackbarSeverity('info');
       setSnackbarMessage('Cerrando sesión...');
@@ -28,22 +33,28 @@ export default function Login() {
 
   function handleCloseSnackbar() {
     setSnackbarOpen(false);
+    setSnackbarMessage('');
   }
 
   async function handleLogin(event?: React.FormEvent) {
     if (event) event.preventDefault();
-    setErrorMsg('');
 
     try {
       if (!window.electronAPI) {
-        setErrorMsg('No API disponible');
+        // Mostramos error con snackbar
+        setSnackbarSeverity('error');
+        setSnackbarMessage('No API disponible');
+        setSnackbarOpen(true);
         return;
       }
       // Llamamos a loginUser
       const result = await window.electronAPI.loginUser(username, password);
 
       if (!result.success) {
-        setErrorMsg(result.error || 'Credenciales inválidas');
+        // Credenciales inválidas, etc.
+        setSnackbarSeverity('error');
+        setSnackbarMessage(result.error || 'Credenciales inválidas');
+        setSnackbarOpen(true);
       } else {
         // Guardar userName
         if (result.user?.name) {
@@ -53,8 +64,10 @@ export default function Login() {
         navigate('/app/dashboard', { state: { fromLogin: true } });
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg('Error interno');
+      console.error('Error interno en login:', err);
+      setSnackbarSeverity('error');
+      setSnackbarMessage('Error interno');
+      setSnackbarOpen(true);
     }
   }
 
@@ -65,11 +78,6 @@ export default function Login() {
 
       <form className="login-form" onSubmit={handleLogin}>
         <h1 className="login-title">Iniciar Sesión</h1>
-        {errorMsg && (
-          <p style={{ color: 'red', textAlign: 'center', marginBottom: 10 }}>
-            {errorMsg}
-          </p>
-        )}
 
         <div className="login-input-wrapper">
           <AccountCircle />
@@ -80,6 +88,7 @@ export default function Login() {
             onChange={(e) => setUsername(e.target.value)}
           />
         </div>
+
         <div className="login-input-wrapper">
           <Lock />
           <input
@@ -95,10 +104,10 @@ export default function Login() {
         </button>
       </form>
 
-      {/* Snackbar para mostrar "Cerrando sesión..." */}
+      {/* Snackbar para mostrar mensajes (info, error, etc.) */}
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={2000}
+        autoHideDuration={2500}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         TransitionComponent={Fade}
@@ -108,9 +117,6 @@ export default function Login() {
           severity={snackbarSeverity}
           variant="filled"
           sx={{
-            backgroundColor:
-              snackbarSeverity === 'info' ? '#64748b' : '#3b82f6',
-            color: '#fff',
             fontWeight: 'bold',
             textTransform: 'uppercase',
           }}

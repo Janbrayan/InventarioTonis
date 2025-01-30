@@ -19,9 +19,13 @@ import {
   DialogActions,
   TextField
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
 
-/** Interfaz principal de un Proveedor */
+/** ================== Interfaz principal de un Proveedor ================== */
 interface Provider {
   id?: number;
   nombre: string;
@@ -32,7 +36,7 @@ interface Provider {
   updatedAt?: string; // para mostrar fecha de actualización
 }
 
-/** Diálogo de confirmación genérico */
+/** ================== Diálogo de confirmación genérico ================== */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -49,8 +53,11 @@ function ConfirmDialog({
   onConfirm
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"
-      // Si deseas un blur en el fondo:
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
       BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
@@ -67,6 +74,36 @@ function ConfirmDialog({
   );
 }
 
+/** ================== Diálogo de error (reemplaza alert) ================== */
+interface ErrorDialogProps {
+  open: boolean;
+  errorMessage: string;
+  onClose: () => void;
+}
+
+function ErrorDialog({ open, errorMessage, onClose }: ErrorDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold' }}>Error</DialogTitle>
+      <DialogContent>
+        <Typography>{errorMessage}</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained">
+          Cerrar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** ================== Componente principal ================== */
 export default function Proveedores() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,13 +112,12 @@ export default function Proveedores() {
   const [openModal, setOpenModal] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
 
-  // Campos de formulario (todo string: sin bloqueos)
+  // Campos de formulario
   const [nombre, setNombre] = useState('');
   const [contacto, setContacto] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
-  // Si quisieras manejar "activo" como checkbox, podrías añadirlo
-  // const [activo, setActivo] = useState(true);
+  // const [activo, setActivo] = useState(true); // si necesitases un checkbox
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -89,6 +125,10 @@ export default function Proveedores() {
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
+  // Diálogo de error general (reemplaza alert)
+  const [error, setError] = useState('');
+
+  // ================== Cargar proveedores al montar ==================
   useEffect(() => {
     fetchProviders();
   }, []);
@@ -100,6 +140,7 @@ export default function Proveedores() {
       setProviders(resp || []);
     } catch (error) {
       console.error('Error al obtener proveedores:', error);
+      setError('No se pudo cargar la lista de proveedores.');
     } finally {
       setLoading(false);
     }
@@ -149,7 +190,9 @@ export default function Proveedores() {
 
   // ========== Guardar (Crear/Editar) ==========
   async function handleSaveProvider() {
+    // Cerramos el modal antes de abrir confirm
     setOpenModal(false);
+
     const isEdit = !!editingProvider;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
 
@@ -160,6 +203,11 @@ export default function Proveedores() {
         try {
           if (!window.electronAPI) return;
 
+          if (!nombre.trim()) {
+            setError('El nombre del proveedor es obligatorio.');
+            return;
+          }
+
           if (!isEdit) {
             // Crear
             const result = await window.electronAPI.createProvider({
@@ -167,11 +215,10 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              // activo
-              activo: true // o lo que gustes
+              activo: true
             });
             if (!result?.success) {
-              alert('No se pudo crear el proveedor.');
+              setError('No se pudo crear el proveedor en la base de datos.');
             }
           } else {
             // Editar
@@ -181,17 +228,17 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              // activo
-              activo: true // p.ej.
+              activo: true
             });
             if (!result?.success) {
-              alert('No se pudo actualizar el proveedor.');
+              setError('No se pudo actualizar el proveedor en la base de datos.');
             }
           }
 
           await fetchProviders();
         } catch (err) {
           console.error('Error guardando proveedor:', err);
+          setError('Error de comunicación al guardar el proveedor.');
         } finally {
           closeConfirmDialog();
         }
@@ -209,16 +256,21 @@ export default function Proveedores() {
           if (!window.electronAPI) return;
           const resp = await window.electronAPI.deleteProvider(prov.id!);
           if (!resp?.success) {
-            alert('No se pudo eliminar al proveedor.');
+            setError('No se pudo eliminar al proveedor en la base de datos.');
           }
           await fetchProviders();
         } catch (err) {
           console.error('Error eliminando proveedor:', err);
+          setError('Error de comunicación al eliminar el proveedor.');
         } finally {
           closeConfirmDialog();
         }
       }
     );
+  }
+
+  function handleCloseError() {
+    setError('');
   }
 
   if (loading) {
@@ -363,13 +415,12 @@ export default function Proveedores() {
         </CardContent>
       </Card>
 
-      {/* Modal Crear/Editar Proveedor */}
+      {/* ============ Modal Crear/Editar Proveedor ============ */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
         fullWidth
         maxWidth="sm"
-        // Si deseas blur en el fondo del modal:
         BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
@@ -403,7 +454,6 @@ export default function Proveedores() {
             onChange={(e) => setEmail(e.target.value)}
             fullWidth
           />
-          {/* Si deseas un checkbox de "activo", podrías agregarlo aquí */}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={handleCloseModal}>Cancelar</Button>
@@ -413,13 +463,20 @@ export default function Proveedores() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de confirmación */}
+      {/* ============ Diálogo de confirmación ============ */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+      />
+
+      {/* ============ Diálogo de error general ============ */}
+      <ErrorDialog
+        open={!!error}
+        errorMessage={error}
+        onClose={() => setError('')}
       />
     </Box>
   );
