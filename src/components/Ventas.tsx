@@ -48,15 +48,21 @@ interface Sale {
   updatedAt?: string;
 }
 
-/** Renglón de la venta (simplificado) */
+/** 
+ * DetalleVenta:
+ * - cantidad / precioUnitario: valor numérico
+ * - cantidadStr / precioStr: cadenas que guardan exactamente lo que el usuario teclea
+ */
 interface DetalleVenta {
   productoId: number;
   cantidad: number;
+  cantidadStr: string;
   precioUnitario: number;
+  precioStr: string;
   subtotal: number;
 }
 
-/** Diálogo de confirmación */
+/** Props del Diálogo de Confirmación */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -99,7 +105,7 @@ function ConfirmDialog({
   );
 }
 
-/** Diálogo de alerta (un solo botón “Cerrar”) */
+/** Props del Diálogo de Alerta (un solo botón “Cerrar”) */
 interface AlertDialogProps {
   open: boolean;
   message: string;
@@ -158,7 +164,7 @@ export default function Ventas() {
   // Modal para crear una venta
   const [openModal, setOpenModal] = useState(false);
 
-  // Detalles de la venta en curso
+  // Detalles de la venta en curso (arreglo de DetalleVenta)
   const [detalles, setDetalles] = useState<DetalleVenta[]>([]);
 
   // Confirm Dialog
@@ -249,7 +255,8 @@ export default function Ventas() {
 
   // ===================== Abrir/cerrar modal Crear Venta =====================
   function handleOpenCreate() {
-    // Por si deseas resetear: setDetalles([]);
+    // Resetear la venta si gustas:
+    // setDetalles([]);
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
@@ -277,15 +284,19 @@ export default function Ventas() {
     setSelProductoId(0);
   }
 
-  // ===================== Agregar producto =====================
+  // ===================== Agregar producto al carrito =====================
   function addProductById(productId: number) {
     const index = detalles.findIndex((r) => r.productoId === productId);
     if (index >= 0) {
-      // Ya existe => incrementar
+      // Ya existe => incrementar la cantidad
       const copy = [...detalles];
-      copy[index].cantidad += 1;
-      copy[index].subtotal = copy[index].cantidad * copy[index].precioUnitario;
+      const row = copy[index];
+
+      row.cantidad += 1;
+      row.cantidadStr = String(row.cantidad);
+      row.subtotal = row.cantidad * row.precioUnitario;
       setDetalles(copy);
+
     } else {
       const prod = products.find((p) => p.id === productId);
       if (!prod) return;
@@ -294,7 +305,9 @@ export default function Ventas() {
       const nuevo: DetalleVenta = {
         productoId: productId,
         cantidad: 1,
+        cantidadStr: '1',
         precioUnitario: precio,
+        precioStr: String(precio),
         subtotal: precio
       };
       setDetalles((prev) => [...prev, nuevo]);
@@ -308,20 +321,38 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  // ===================== Cambiar cantidad/precio =====================
-  // IMPORTANTE: Aceptar un union: e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  function handleChangeCantidad(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
-    const val = parseFloat(e.target.value) || 0;
+  // ===================== Cambiar cantidad/precio (usamos strings) =====================
+  function handleChangeCantidad(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    idx: number
+  ) {
+    const inputValue = e.target.value;
     const copy = [...detalles];
-    copy[idx].cantidad = val;
-    copy[idx].subtotal = copy[idx].cantidad * copy[idx].precioUnitario;
+    const row = copy[idx];
+
+    row.cantidadStr = inputValue; // guardo la cadena tecleada
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed)) {
+      row.cantidad = parsed;
+      row.subtotal = row.cantidad * row.precioUnitario;
+    }
     setDetalles(copy);
   }
-  function handleChangePrecio(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, idx: number) {
-    const val = parseFloat(e.target.value) || 0;
+
+  function handleChangePrecio(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, 
+    idx: number
+  ) {
+    const inputValue = e.target.value;
     const copy = [...detalles];
-    copy[idx].precioUnitario = val;
-    copy[idx].subtotal = copy[idx].cantidad * val;
+    const row = copy[idx];
+
+    row.precioStr = inputValue;
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed)) {
+      row.precioUnitario = parsed;
+      row.subtotal = row.cantidad * row.precioUnitario;
+    }
     setDetalles(copy);
   }
 
@@ -344,6 +375,7 @@ export default function Ventas() {
     const action = async () => {
       try {
         const total = calcularTotal();
+        // Mandamos la versión numérica (cantidad, precioUnitario) al backend
         const saleData = {
           total,
           detalles: detalles.map((d) => ({
@@ -548,7 +580,6 @@ export default function Ventas() {
               onChange={handleChangeProducto}
             >
               <MenuItem value={0}>-- Seleccionar --</MenuItem>
-
               {products.map((p) => {
                 const stockVal = p.stock ?? 0;
                 return (
@@ -592,18 +623,18 @@ export default function Ventas() {
                     <TableRow key={idx}>
                       <TableCell>{nombreProd}</TableCell>
                       <TableCell>
-                        {/* Ojo: el onChange maneja e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> */}
                         <TextField
-                          type="number"
-                          value={d.cantidad}
+                          // type="text" para permitir cualquier input
+                          type="text"
+                          value={d.cantidadStr}
                           onChange={(e) => handleChangeCantidad(e, idx)}
                           sx={{ width: 60 }}
                         />
                       </TableCell>
                       <TableCell>
                         <TextField
-                          type="number"
-                          value={d.precioUnitario}
+                          type="text"
+                          value={d.precioStr}
                           onChange={(e) => handleChangePrecio(e, idx)}
                           sx={{ width: 80 }}
                         />

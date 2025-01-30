@@ -37,14 +37,14 @@ interface Product {
   id?: number;
   nombre: string;
   categoriaId?: number | null;
-  precioCompra?: number;   // precio de compra
-  precioVenta?: number;    // precio de venta
+  precioCompra?: number;   // precio de compra real
+  precioVenta?: number;    // precio de venta real
   codigoBarras?: string;
   activo?: boolean;
   updatedAt?: string;
 }
 
-// Diálogo de confirmación genérico
+/** Diálogo de confirmación genérico */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -78,7 +78,9 @@ function ConfirmDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" onClick={onConfirm}>Aceptar</Button>
+        <Button variant="contained" onClick={onConfirm}>
+          Aceptar
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -99,13 +101,18 @@ export default function GestionProductos() {
   const [openModal, setOpenModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Form fields
+  // Form fields (manejar como strings para no bloquear)
   const [nombre, setNombre] = useState('');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
-  const [precioCompra, setPrecioCompra] = useState<number>(0);
-  const [precioVenta, setPrecioVenta] = useState<number>(0);
+
+  // Almacena los valores del precio en strings; luego convertimos a número
+  const [precioCompraStr, setPrecioCompraStr] = useState('0');
+  const [precioVentaStr, setPrecioVentaStr] = useState('0');
+
   const [codigoBarras, setCodigoBarras] = useState('');
-  const [activo, setActivo] = useState(true);
+  // Si en tu lógica requieres un "activo" como checkbox/switch, puedes agregarlo
+  // (Actualmente no tienes un input para "activo" en el modal, pero puedes hacerlo)
+  const [activo] = useState(true);
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -134,36 +141,34 @@ export default function GestionProductos() {
     }
   }
 
-  // EFECTO PARA ABRIR MODAL AUTOMÁTICAMENTE SEGÚN location.state
+  // Efecto para abrir modal automáticamente según location.state
   useEffect(() => {
-    // Checa si location.state tiene algo como: { createBarcode: string } o { editBarcode: string }
     const state: any = location.state;
     if (state?.createBarcode) {
-      // QUIERO CREAR un producto con el código prellenado
+      // QUIERO CREAR con barcode prellenado
       handleOpenCreate(state.createBarcode);
 
-      // Limpio location.state para que no reabra al recargar
+      // Limpio location.state
       navigate(location.pathname, { replace: true });
     } else if (state?.editBarcode) {
-      // QUIERO EDITAR un producto que ya existe
-      // Tendrías que buscarlo en 'products' o hacer un getProductByBarcode
+      // QUIERO EDITAR un producto ya existente
       const found = products.find(p => p.codigoBarras === state.editBarcode);
-      if (found) handleOpenEdit(found);
-
-      // Limpio location.state
+      if (found) {
+        handleOpenEdit(found);
+      }
       navigate(location.pathname, { replace: true });
     }
   }, [location.state, navigate, products]);
 
-  // Abrir modal para crear (opcional: pasar un barcode ya)
+  // Abrir modal para crear (opcional: pasar un barcode)
   function handleOpenCreate(barcode?: string) {
     setEditingProduct(null);
     setNombre('');
     setCategoriaId(null);
-    setPrecioCompra(0);
-    setPrecioVenta(0);
-    setCodigoBarras(barcode ?? ''); // si viene barcode, lo pongo
-    setActivo(true);
+    setPrecioCompraStr('0');
+    setPrecioVentaStr('0');
+    setCodigoBarras(barcode ?? '');
+    // setActivo(true); // si tuvieras check activo, reinit
     setOpenModal(true);
   }
 
@@ -172,10 +177,10 @@ export default function GestionProductos() {
     setEditingProduct(prod);
     setNombre(prod.nombre);
     setCategoriaId(prod.categoriaId ?? null);
-    setPrecioCompra(prod.precioCompra ?? 0);
-    setPrecioVenta(prod.precioVenta ?? 0);
+    setPrecioCompraStr((prod.precioCompra ?? 0).toString());
+    setPrecioVentaStr((prod.precioVenta ?? 0).toString());
     setCodigoBarras(prod.codigoBarras ?? '');
-    setActivo(prod.activo ?? true);
+    // setActivo(prod.activo ?? true);
     setOpenModal(true);
   }
 
@@ -197,6 +202,16 @@ export default function GestionProductos() {
 
   // Guardar (crear o editar)
   async function handleSaveProduct() {
+    // 1) Convertimos los strings a números
+    const pc = parseFloat(precioCompraStr) || 0;
+    const pv = parseFloat(precioVentaStr) || 0;
+
+    // 2) Validaciones mínimas
+    if (!nombre.trim()) {
+      alert('El nombre de producto es obligatorio');
+      return;
+    }
+
     setOpenModal(false);
     const isEdit = !!editingProduct;
     const actionText = isEdit ? 'ACTUALIZAR' : 'CREAR';
@@ -213,8 +228,8 @@ export default function GestionProductos() {
             const resp = await window.electronAPI.createProduct({
               nombre,
               categoriaId,
-              precioCompra,
-              precioVenta,
+              precioCompra: pc,
+              precioVenta: pv,
               codigoBarras,
               activo
             });
@@ -227,8 +242,8 @@ export default function GestionProductos() {
               id: editingProduct.id,
               nombre,
               categoriaId,
-              precioCompra,
-              precioVenta,
+              precioCompra: pc,
+              precioVenta: pv,
               codigoBarras,
               activo
             });
@@ -342,7 +357,9 @@ export default function GestionProductos() {
                       <TableCell sx={{ color: '#fff' }}>
                         {prod.precioVenta !== undefined ? `$${prod.precioVenta}` : '—'}
                       </TableCell>
-                      <TableCell sx={{ color: '#fff' }}>{prod.codigoBarras || '—'}</TableCell>
+                      <TableCell sx={{ color: '#fff' }}>
+                        {prod.codigoBarras || '—'}
+                      </TableCell>
                       <TableCell sx={{ color: prod.activo ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
                         {prod.activo ? 'Sí' : 'No'}
                       </TableCell>
@@ -393,11 +410,7 @@ export default function GestionProductos() {
         onClose={handleCloseModal}
         fullWidth
         maxWidth="sm"
-        BackdropProps={{
-          style: {
-            backdropFilter: 'blur(6px)'
-          }
-        }}
+        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           {editingProduct ? 'Editar Producto' : 'Crear Producto'}
@@ -430,46 +443,25 @@ export default function GestionProductos() {
             </Select>
           </FormControl>
 
-          {/* Precio de Compra con $ en la etiqueta */}
           <TextField
             label="Precio de Compra ($)"
-            type="number"
-            value={precioCompra === 0 ? '' : precioCompra}
+            type="text"
+            value={precioCompraStr}
             onChange={(e) => {
-              const val = e.target.value;
-              setPrecioCompra(val === '' ? 0 : Number(val));
-            }}
-            inputMode="numeric"
-            InputProps={{
-              inputProps: {
-                pattern: '[0-9]*',
-                style: {
-                  MozAppearance: 'textfield',
-                  WebkitAppearance: 'none'
-                }
-              }
+              // Filtra caracteres no deseados
+              const val = e.target.value.replace(/[^\d.]/g, '');
+              setPrecioCompraStr(val);
             }}
             fullWidth
           />
 
-          {/* Precio de Venta con $ en la etiqueta */}
           <TextField
             label="Precio de Venta ($)"
-            type="number"
-            value={precioVenta === 0 ? '' : precioVenta}
+            type="text"
+            value={precioVentaStr}
             onChange={(e) => {
-              const val = e.target.value;
-              setPrecioVenta(val === '' ? 0 : Number(val));
-            }}
-            inputMode="numeric"
-            InputProps={{
-              inputProps: {
-                pattern: '[0-9]*',
-                style: {
-                  MozAppearance: 'textfield',
-                  WebkitAppearance: 'none'
-                }
-              }
+              const val = e.target.value.replace(/[^\d.]/g, '');
+              setPrecioVentaStr(val);
             }}
             fullWidth
           />

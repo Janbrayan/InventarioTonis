@@ -41,14 +41,23 @@ interface Product {
   nombre: string;
 }
 interface DetalleCompra {
-  productoId: number;
+  /** Valor numérico real, usado en el cálculo final. */
   cantidad: number;
+  /** Texto que el usuario teclea, para no bloquear. */
+  cantidadStr: string;
+
+  /** Valor numérico real, usado en el cálculo final. */
   precioUnitario: number;
+  /** Texto que el usuario teclea, para no bloquear. */
+  precioUnitStr: string;
+
   tipoContenedor: 'unidad' | 'caja' | 'paquete';
   unidadesPorContenedor?: number;
+
+  productoId: number;
   lote?: string;
   fechaCaducidad?: string;
-  precioVenta?: number;
+  precioVenta?: number; // opcional
 }
 interface Purchase {
   id?: number;
@@ -97,7 +106,7 @@ function ConfirmDialog({
   );
 }
 
-/** =============== Submodal para llenar datos del producto a agregar =============== */
+/** =============== Submodal para añadir un renglón de detalle =============== */
 interface DetalleModalProps {
   open: boolean;
   onClose: () => void;
@@ -112,69 +121,67 @@ function DetalleModal({
   products,
   preselectedProductId,
 }: DetalleModalProps) {
-  // Usamos strings en los campos numéricos para permitir borrar '0' y quedar en blanco
+  // Producto seleccionado
   const [productoId, setProductoId] = useState<number>(0);
 
-  const [cantidadStr, setCantidadStr] = useState<string>('1');
-  const [precioUnitStr, setPrecioUnitStr] = useState<string>('0');
+  // Strings para que el usuario teclee lo que quiera sin bloquear
+  const [cantidadStr, setCantidadStr] = useState('1');
+  const [precioUnitStr, setPrecioUnitStr] = useState('0');
+
+  // Tipo (unidad, caja, paquete) + unid x contenedor
   const [tipoCont, setTipoCont] = useState<'unidad' | 'caja' | 'paquete'>('unidad');
-  const [upcStr, setUpcStr] = useState<string>('1');
+  const [upcStr, setUpcStr] = useState('1');
 
   const [lote, setLote] = useState('');
-  const [caducidad, setCaducidad] = useState('');
-  const [precioVentaStr, setPrecioVentaStr] = useState<string>('0');
+  const [fechaCaducidad, setFechaCaducidad] = useState('');
+  const [precioVentaStr, setPrecioVentaStr] = useState('0');
 
-  function handleConfirm() {
-    // 1) Verificar producto
-    if (!productoId || productoId <= 0) {
-      alert('Selecciona un producto válido.');
-      return;
-    }
-    // 2) Convertir strings a número
-    const c = parseFloat(cantidadStr) || 0;
-    const pu = parseFloat(precioUnitStr) || 0;
-    const pv = parseFloat(precioVentaStr) || 0;
-    const upc = parseFloat(upcStr) || 1;
-
-    // 3) Validar > 0
-    if (c <= 0 || pu <= 0) {
-      alert('Cantidad y precio deben ser mayores a 0.');
-      return;
-    }
-
-    // 4) Crear detalle
-    const detalle: DetalleCompra = {
-      productoId,
-      cantidad: c,
-      precioUnitario: pu,
-      tipoContenedor: tipoCont,
-      unidadesPorContenedor: tipoCont !== 'unidad' ? upc : 1,
-      lote: lote || undefined,
-      fechaCaducidad: caducidad || undefined,
-      precioVenta: pv || undefined,
-    };
-    onSave(detalle);
-    onClose();
-  }
-
-  // Resetear al abrir
+  // Cada vez que abra el modal, resetea
   React.useEffect(() => {
     if (open) {
+      setProductoId(preselectedProductId || 0);
       setCantidadStr('1');
       setPrecioUnitStr('0');
       setTipoCont('unidad');
       setUpcStr('1');
       setLote('');
-      setCaducidad('');
+      setFechaCaducidad('');
       setPrecioVentaStr('0');
-
-      if (preselectedProductId) {
-        setProductoId(preselectedProductId);
-      } else {
-        setProductoId(0);
-      }
     }
   }, [open, preselectedProductId]);
+
+  function handleConfirm() {
+    if (!productoId || productoId <= 0) {
+      alert('Selecciona un producto válido.');
+      return;
+    }
+
+    // Convierte strings a número reales
+    const cant = parseFloat(cantidadStr) || 0;
+    const pu = parseFloat(precioUnitStr) || 0;
+    const upc = parseFloat(upcStr) || 1;
+    const pVenta = parseFloat(precioVentaStr) || 0;
+
+    if (cant <= 0 || pu <= 0) {
+      alert('Cantidad y precio deben ser mayores a 0');
+      return;
+    }
+
+    const det: DetalleCompra = {
+      productoId,
+      cantidad: cant,
+      cantidadStr,
+      precioUnitario: pu,
+      precioUnitStr,
+      tipoContenedor: tipoCont,
+      unidadesPorContenedor: tipoCont === 'unidad' ? 1 : upc,
+      lote: lote || undefined,
+      fechaCaducidad: fechaCaducidad || undefined,
+      precioVenta: pVenta || undefined,
+    };
+    onSave(det);
+    onClose();
+  }
 
   return (
     <Dialog
@@ -187,16 +194,14 @@ function DetalleModal({
       <DialogTitle sx={{ fontWeight: 'bold' }}>Agregar Producto</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
         <FormControl fullWidth>
-          <InputLabel id="prod-select-label">Producto</InputLabel>
+          <InputLabel id="select-product-label">Producto</InputLabel>
           <Select
-            labelId="prod-select-label"
-            value={productoId || ''}
+            labelId="select-product-label"
+            value={productoId || 0}
             label="Producto"
             onChange={(e) => setProductoId(Number(e.target.value))}
           >
-            <MenuItem value={0} disabled>
-              -- Seleccionar --
-            </MenuItem>
+            <MenuItem value={0} disabled>-- Seleccionar --</MenuItem>
             {products.map((p) => (
               <MenuItem key={p.id} value={p.id}>
                 {p.nombre}
@@ -205,12 +210,12 @@ function DetalleModal({
           </Select>
         </FormControl>
 
-        {/* Campos numéricos con string */}
         <TextField
           label="Cantidad"
           type="text"
           value={cantidadStr}
           onChange={(e) => {
+            // Permite dígitos y punto
             const val = e.target.value.replace(/[^\d.]/g, '');
             setCantidadStr(val);
           }}
@@ -261,8 +266,8 @@ function DetalleModal({
         <TextField
           label="Caducidad"
           type="date"
-          value={caducidad}
-          onChange={(e) => setCaducidad(e.target.value)}
+          value={fechaCaducidad}
+          onChange={(e) => setFechaCaducidad(e.target.value)}
           InputLabelProps={{ shrink: true }}
         />
 
@@ -349,6 +354,7 @@ export default function Compras() {
     if (st?.openModal === 'createCompra') {
       handleOpenCreate();
       if (st.openDetalle === true && typeof st.productId === 'number') {
+        // abrimos submodal con productId
         setTimeout(() => {
           setPreselectedProductId(st.productId);
           setOpenDetalleModal(true);
@@ -395,28 +401,31 @@ export default function Compras() {
 
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => {
-      let sub = 0;
+      const c = d.cantidad;
+      const pu = d.precioUnitario;
       const upc = d.unidadesPorContenedor ?? 1;
+
+      let sub = 0;
       if (d.tipoContenedor === 'paquete') {
-        sub = d.cantidad * upc * d.precioUnitario;
+        sub = c * upc * pu;
       } else if (d.tipoContenedor === 'caja') {
-        sub = d.cantidad * d.precioUnitario;
+        sub = c * pu;
       } else {
-        sub = d.cantidad * d.precioUnitario;
+        // unidad
+        sub = c * pu;
       }
       return acc + sub;
     }, 0);
   }
 
   async function handleSaveCompra() {
-    // 1) Proveedor obligatorio
+    // Validaciones mínimas
     if (proveedorId <= 0) {
       alert('Selecciona un proveedor válido antes de guardar.');
       return;
     }
-    // 2) Al menos 1 producto
     if (detalles.length === 0) {
-      alert('Debes agregar al menos un producto (renglón) antes de guardar.');
+      alert('Debes agregar al menos un producto antes de guardar.');
       return;
     }
 
@@ -603,7 +612,7 @@ export default function Compras() {
         </CardContent>
       </Card>
 
-      {/* ============ Modal Crear Compra ============ */}
+      {/* ============ Modal Crear/Editar Compra ============ */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
@@ -617,7 +626,7 @@ export default function Compras() {
             <InputLabel id="prov-label">Proveedor</InputLabel>
             <Select
               labelId="prov-label"
-              value={proveedorId || ''}
+              value={proveedorId || 0}
               label="Proveedor"
               onChange={(e) => setProveedorId(Number(e.target.value))}
             >
@@ -651,12 +660,11 @@ export default function Compras() {
           <Typography variant="h6" sx={{ mt: 2 }}>
             Detalles
           </Typography>
-
-          <Button variant="outlined" color="info" onClick={handleOpenDetalleModal}>
+          <Button variant="outlined" color="info" onClick={() => setOpenDetalleModal(true)}>
             <AddIcon /> Agregar Producto
           </Button>
 
-          {/* Tabla de Detalles (renglones confirmados) */}
+          {/* Tabla de Detalles */}
           <TableContainer component={Paper} sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
@@ -664,11 +672,9 @@ export default function Compras() {
                   <TableCell>Producto</TableCell>
                   <TableCell>Cant</TableCell>
                   <TableCell>P.Unit</TableCell>
-                  <TableCell>Precio x Pieza</TableCell>
                   <TableCell>Subtotal</TableCell>
                   <TableCell>Tipo</TableCell>
-                  <TableCell>Unid x Cont.</TableCell>
-                  <TableCell>Piezas</TableCell>
+                  <TableCell>Unid/Cont</TableCell>
                   <TableCell>Lote</TableCell>
                   <TableCell>Caducidad</TableCell>
                   <TableCell>Precio Venta</TableCell>
@@ -677,49 +683,43 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detalles.map((d, idx) => {
-                  const prodName =
-                    products.find((pp) => pp.id === d.productoId)?.nombre ||
-                    `ID=${d.productoId}`;
+                  const prodName = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
 
-                  let sub = 0;
-                  let precioPorPieza = 0;
+                  const cant = d.cantidad;
+                  const pu = d.precioUnitario;
                   const upc = d.unidadesPorContenedor ?? 1;
 
+                  let sub = 0;
                   if (d.tipoContenedor === 'paquete') {
-                    sub = d.cantidad * upc * d.precioUnitario;
-                    precioPorPieza = d.precioUnitario;
+                    sub = cant * upc * pu;
                   } else if (d.tipoContenedor === 'caja') {
-                    sub = d.cantidad * d.precioUnitario;
-                    precioPorPieza = d.precioUnitario / upc;
+                    sub = cant * pu;
                   } else {
-                    sub = d.cantidad * d.precioUnitario;
-                    precioPorPieza = d.precioUnitario;
+                    // unidad
+                    sub = cant * pu;
                   }
-
-                  const piezasTotales = d.tipoContenedor === 'unidad'
-                    ? d.cantidad
-                    : d.cantidad * upc;
 
                   return (
                     <TableRow key={idx}>
                       <TableCell>{prodName}</TableCell>
-                      <TableCell>{d.cantidad}</TableCell>
-                      <TableCell>${d.precioUnitario}</TableCell>
-                      <TableCell>${precioPorPieza.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {d.cantidadStr} {/* lo que ve el usuario */}
+                      </TableCell>
+                      <TableCell>
+                        {d.precioUnitStr}
+                      </TableCell>
                       <TableCell>${sub.toFixed(2)}</TableCell>
                       <TableCell>{d.tipoContenedor}</TableCell>
                       <TableCell>
-                        {(d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete')
-                          ? upc
-                          : '—'}
+                        {(d.tipoContenedor === 'unidad')
+                          ? '—'
+                          : (d.unidadesPorContenedor ?? '1')}
                       </TableCell>
-                      <TableCell>{piezasTotales}</TableCell>
                       <TableCell>{d.lote || '—'}</TableCell>
                       <TableCell>
                         {d.fechaCaducidad
                           ? new Date(d.fechaCaducidad).toLocaleDateString()
-                          : '—'
-                        }
+                          : '—'}
                       </TableCell>
                       <TableCell>
                         {d.precioVenta != null ? `$${d.precioVenta}` : '—'}
@@ -729,7 +729,9 @@ export default function Compras() {
                           variant="contained"
                           color="error"
                           size="small"
-                          onClick={() => removeRenglonDetalle(idx)}
+                          onClick={() => {
+                            removeRenglonDetalle(idx);
+                          }}
                         >
                           Eliminar
                         </Button>
@@ -737,11 +739,10 @@ export default function Compras() {
                     </TableRow>
                   );
                 })}
-
                 {detalles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} align="center">
-                      Sin renglones aún
+                    <TableCell colSpan={10} align="center">
+                      (Sin renglones)
                     </TableCell>
                   </TableRow>
                 )}
@@ -750,15 +751,28 @@ export default function Compras() {
           </TableContainer>
 
           <Typography variant="h6" sx={{ mt: 2, textAlign: 'right' }}>
-            Total de la compra: ${calcularTotal().toFixed(2)}
+            Total de la compra: $
+            {detalles.reduce((acc, d) => {
+              const c = d.cantidad;
+              const pu = d.precioUnitario;
+              const upc = d.unidadesPorContenedor ?? 1;
+
+              let sub = 0;
+              if (d.tipoContenedor === 'paquete') {
+                sub = c * upc * pu;
+              } else if (d.tipoContenedor === 'caja') {
+                sub = c * pu;
+              } else {
+                // unidad
+                sub = c * pu;
+              }
+              return acc + sub;
+            }, 0).toFixed(2)}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseModal}>Cancelar</Button>
-          <Button
-            variant="contained"
-            onClick={handleSaveCompra}
-          >
+          <Button variant="contained" onClick={handleSaveCompra}>
             Guardar
           </Button>
         </DialogActions>
@@ -767,8 +781,10 @@ export default function Compras() {
       {/* Submodal de detalle */}
       <DetalleModal
         open={openDetalleModal}
-        onClose={handleCloseDetalleModal}
-        onSave={handleAddDetalle}
+        onClose={() => setOpenDetalleModal(false)}
+        onSave={(det) => {
+          setDetalles((prev) => [...prev, det]);
+        }}
         products={products}
         preselectedProductId={preselectedProductId}
       />
@@ -793,11 +809,9 @@ export default function Compras() {
                   <TableCell>Producto</TableCell>
                   <TableCell>Cantidad</TableCell>
                   <TableCell>PrecioUnit</TableCell>
-                  <TableCell>Precio x Pieza</TableCell>
                   <TableCell>Subtotal</TableCell>
                   <TableCell>Tipo</TableCell>
-                  <TableCell>Unid x Cont.</TableCell>
-                  <TableCell>Piezas</TableCell>
+                  <TableCell>Unid x Cont</TableCell>
                   <TableCell>Lote</TableCell>
                   <TableCell>Caducidad</TableCell>
                   <TableCell>Actualizado</TableCell>
@@ -805,46 +819,34 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detallesCompra.map((d) => {
-                  const product = products.find((pp) => pp.id === d.productoId);
-                  const pName = product?.nombre || `ID=${d.productoId}`;
-
-                  let sub = 0;
+                  const pName = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
+                  const c = d.cantidad;
+                  const pu = d.precioUnitario;
                   const upc = d.unidadesPorContenedor ?? 1;
+                  let sub = 0;
+
                   if (d.tipoContenedor === 'paquete') {
-                    sub = d.cantidad * upc * d.precioUnitario;
+                    sub = c * upc * pu;
                   } else if (d.tipoContenedor === 'caja') {
-                    sub = d.cantidad * d.precioUnitario;
+                    sub = c * pu;
                   } else {
-                    sub = d.cantidad * d.precioUnitario;
+                    sub = c * pu;
                   }
-
-                  const piezas =
-                    d.tipoContenedor === 'unidad'
-                      ? d.cantidad
-                      : d.cantidad * upc;
-
-                  const precioPorPieza = d.precioPorPieza
-                    ? d.precioPorPieza.toFixed(2)
-                    : '—';
 
                   return (
                     <TableRow key={d.id}>
                       <TableCell>{d.id}</TableCell>
                       <TableCell>{pName}</TableCell>
-                      <TableCell>{d.cantidad}</TableCell>
-                      <TableCell>${d.precioUnitario}</TableCell>
-                      <TableCell>
-                        {precioPorPieza !== '—' ? `$${precioPorPieza}` : '—'}
-                      </TableCell>
+                      <TableCell>{c}</TableCell>
+                      <TableCell>${pu}</TableCell>
                       <TableCell>${sub.toFixed(2)}</TableCell>
                       <TableCell>{d.tipoContenedor || 'unidad'}</TableCell>
                       <TableCell>
-                        {(d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete')
-                          ? upc
-                          : '—'
+                        {(d.tipoContenedor === 'unidad')
+                          ? '—'
+                          : (d.unidadesPorContenedor ?? 1)
                         }
                       </TableCell>
-                      <TableCell>{piezas}</TableCell>
                       <TableCell>{d.lote || '—'}</TableCell>
                       <TableCell>
                         {d.fechaCaducidad
@@ -855,15 +857,15 @@ export default function Compras() {
                       <TableCell>
                         {d.updatedAt
                           ? new Date(d.updatedAt).toLocaleString()
-                          : '—'}
+                          : '—'
+                        }
                       </TableCell>
                     </TableRow>
                   );
                 })}
-
                 {detallesCompra.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} align="center">
+                    <TableCell colSpan={10} align="center">
                       Sin detalles
                     </TableCell>
                   </TableRow>

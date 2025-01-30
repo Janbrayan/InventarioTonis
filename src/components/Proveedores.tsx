@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
+/** Interfaz principal de un Proveedor */
 interface Provider {
   id?: number;
   nombre: string;
@@ -28,10 +29,10 @@ interface Provider {
   telefono?: string;
   email?: string;
   activo?: boolean;
-  updatedAt?: string; // <-- para mostrar fecha de actualización
+  updatedAt?: string; // para mostrar fecha de actualización
 }
 
-// Diálogo de confirmación genérico
+/** Diálogo de confirmación genérico */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -48,14 +49,19 @@ function ConfirmDialog({
   onConfirm
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"
+      // Si deseas un blur en el fondo:
+      BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+    >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
       <DialogContent>
         <Typography>{message}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" onClick={onConfirm}>Aceptar</Button>
+        <Button variant="contained" onClick={onConfirm}>
+          Aceptar
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -69,12 +75,13 @@ export default function Proveedores() {
   const [openModal, setOpenModal] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
 
-  // Campos del formulario
+  // Campos de formulario (todo string: sin bloqueos)
   const [nombre, setNombre] = useState('');
   const [contacto, setContacto] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
-  const [activo, setActivo] = useState(true);
+  // Si quisieras manejar "activo" como checkbox, podrías añadirlo
+  // const [activo, setActivo] = useState(true);
 
   // Diálogo de confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -98,25 +105,25 @@ export default function Proveedores() {
     }
   }
 
-  // Abrir modal para crear
+  // ========== Modal Crear ==========
   function handleOpenCreate() {
     setEditingProvider(null);
     setNombre('');
     setContacto('');
     setTelefono('');
     setEmail('');
-    setActivo(true);
+    // setActivo(true);
     setOpenModal(true);
   }
 
-  // Abrir modal para editar
+  // ========== Modal Editar ==========
   function handleOpenEdit(prov: Provider) {
     setEditingProvider(prov);
     setNombre(prov.nombre);
     setContacto(prov.contacto ?? '');
     setTelefono(prov.telefono ?? '');
     setEmail(prov.email ?? '');
-    setActivo(prov.activo ?? true);
+    // setActivo(prov.activo ?? true);
     setOpenModal(true);
   }
 
@@ -125,8 +132,12 @@ export default function Proveedores() {
     setEditingProvider(null);
   }
 
-  // Abrir confirm dialog
-  function openConfirmDialog(title: string, message: string, action: () => void) {
+  // ========== Confirm Dialog ==========
+  function openConfirmDialog(
+    title: string,
+    message: string,
+    action: () => void
+  ) {
     setConfirmTitle(title);
     setConfirmMessage(message);
     setConfirmAction(() => action);
@@ -136,7 +147,7 @@ export default function Proveedores() {
     setConfirmOpen(false);
   }
 
-  // Guardar (crear o editar)
+  // ========== Guardar (Crear/Editar) ==========
   async function handleSaveProvider() {
     setOpenModal(false);
     const isEdit = !!editingProvider;
@@ -148,6 +159,7 @@ export default function Proveedores() {
       async () => {
         try {
           if (!window.electronAPI) return;
+
           if (!isEdit) {
             // Crear
             const result = await window.electronAPI.createProvider({
@@ -155,7 +167,8 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              activo
+              // activo
+              activo: true // o lo que gustes
             });
             if (!result?.success) {
               alert('No se pudo crear el proveedor.');
@@ -168,12 +181,14 @@ export default function Proveedores() {
               contacto,
               telefono,
               email,
-              activo
+              // activo
+              activo: true // p.ej.
             });
             if (!result?.success) {
               alert('No se pudo actualizar el proveedor.');
             }
           }
+
           await fetchProviders();
         } catch (err) {
           console.error('Error guardando proveedor:', err);
@@ -184,7 +199,7 @@ export default function Proveedores() {
     );
   }
 
-  // Eliminar
+  // ========== Eliminar ==========
   function handleDeleteProvider(prov: Provider) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -212,12 +227,22 @@ export default function Proveedores() {
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: 'bold', color: '#212529' }}
+      >
         Gestión de Proveedores
       </Typography>
 
-      {/* Card con estilo dark */}
-      <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      <Card
+        sx={{
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -227,7 +252,7 @@ export default function Proveedores() {
           sx={{
             backgroundColor: '#343a40',
             borderRadius: '8px 8px 0 0',
-            pb: 1,
+            pb: 1
           }}
           action={
             <Button
@@ -242,9 +267,20 @@ export default function Proveedores() {
           }
         />
         <CardContent sx={{ p: 0 }}>
-          <TableContainer component={Paper} sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}>
+          <TableContainer
+            component={Paper}
+            sx={{
+              borderRadius: '0 0 8px 8px',
+              backgroundColor: '#2b3640'
+            }}
+          >
             <Table>
-              <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
+              <TableHead
+                sx={{
+                  backgroundColor: '#25303a',
+                  '& th': { color: '#fff' }
+                }}
+              >
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Nombre</TableCell>
@@ -252,7 +288,7 @@ export default function Proveedores() {
                   <TableCell>Teléfono</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Activo</TableCell>
-                  <TableCell>Actualizado</TableCell> {/* NUEVA COLUMNA */}
+                  <TableCell>Actualizado</TableCell>
                   <TableCell>Acciones</TableCell>
                 </TableRow>
               </TableHead>
@@ -260,19 +296,35 @@ export default function Proveedores() {
                 {providers.map((prov) => (
                   <TableRow
                     key={prov.id}
-                    sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' } }}
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.05)'
+                      }
+                    }}
                   >
                     <TableCell sx={{ color: '#fff' }}>{prov.id}</TableCell>
                     <TableCell sx={{ color: '#fff' }}>{prov.nombre}</TableCell>
-                    <TableCell sx={{ color: '#fff' }}>{prov.contacto}</TableCell>
-                    <TableCell sx={{ color: '#fff' }}>{prov.telefono}</TableCell>
-                    <TableCell sx={{ color: '#fff' }}>{prov.email}</TableCell>
-                    <TableCell sx={{ color: prov.activo ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
+                    <TableCell sx={{ color: '#fff' }}>
+                      {prov.contacto || '—'}
+                    </TableCell>
+                    <TableCell sx={{ color: '#fff' }}>
+                      {prov.telefono || '—'}
+                    </TableCell>
+                    <TableCell sx={{ color: '#fff' }}>
+                      {prov.email || '—'}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: prov.activo ? '#28a745' : '#dc3545',
+                        fontWeight: 'bold'
+                      }}
+                    >
                       {prov.activo ? 'Sí' : 'No'}
                     </TableCell>
-                    {/* Mostrar updatedAt en formato local (si lo deseas formatear más, usa un toLocaleString) */}
                     <TableCell sx={{ color: '#fff' }}>
-                      {prov.updatedAt ? new Date(prov.updatedAt).toLocaleString() : '—'}
+                      {prov.updatedAt
+                        ? new Date(prov.updatedAt).toLocaleString()
+                        : '—'}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -312,11 +364,20 @@ export default function Proveedores() {
       </Card>
 
       {/* Modal Crear/Editar Proveedor */}
-      <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
+      <Dialog
+        open={openModal}
+        onClose={handleCloseModal}
+        fullWidth
+        maxWidth="sm"
+        // Si deseas blur en el fondo del modal:
+        BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
+      >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           {editingProvider ? 'Editar Proveedor' : 'Crear Proveedor'}
         </DialogTitle>
-        <DialogContent sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <DialogContent
+          sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <TextField
             label="Nombre"
             value={nombre}
@@ -342,6 +403,7 @@ export default function Proveedores() {
             onChange={(e) => setEmail(e.target.value)}
             fullWidth
           />
+          {/* Si deseas un checkbox de "activo", podrías agregarlo aquí */}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={handleCloseModal}>Cancelar</Button>

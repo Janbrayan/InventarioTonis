@@ -22,7 +22,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Collapse,
+  Collapse
 } from '@mui/material';
 
 import {
@@ -30,7 +30,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
-  KeyboardArrowDown as KeyboardArrowDownIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon
 } from '@mui/icons-material';
 
 /** Estructura devuelta por getInventoryGrouped() */
@@ -76,7 +76,7 @@ function ConfirmDialog({
   title,
   message,
   onClose,
-  onConfirm,
+  onConfirm
 }: ConfirmDialogProps) {
   return (
     <Dialog
@@ -85,7 +85,7 @@ function ConfirmDialog({
       fullWidth
       maxWidth="xs"
       BackdropProps={{
-        style: { backdropFilter: 'blur(6px)' },
+        style: { backdropFilter: 'blur(6px)' }
       }}
     >
       <DialogTitle sx={{ fontWeight: 'bold' }}>{title}</DialogTitle>
@@ -118,14 +118,12 @@ function getStockStatus(totalPiezas: number) {
   }
 }
 
-
 /** Componente principal */
 export default function Inventario() {
   // Lista agrupada proveniente del backend
   const [inventory, setInventory] = useState<InventoryGroup[]>([]);
   // Lista completa de productos para el <Select>
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-
   const [loading, setLoading] = useState(true);
 
   // =========================
@@ -134,11 +132,12 @@ export default function Inventario() {
   const [openModal, setOpenModal] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
 
-  // Campos del form de Lote
+  // En lugar de usar number directo, manejaremos strings para cantidadActual
+  // y convertimos a número al guardar.
   const [productoId, setProductoId] = useState<number>(0);
   const [lote, setLote] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
-  const [cantidadActual, setCantidadActual] = useState<number>(0);
+  const [cantidadStr, setCantidadStr] = useState(''); // Usamos string para evitar bloqueos
 
   // =========================
   //     Confirm Dialog
@@ -157,7 +156,8 @@ export default function Inventario() {
   //     Descuento/Merma
   // =========================
   const [descuentoOpen, setDescuentoOpen] = useState(false);
-  const [descuentoCantidad, setDescuentoCantidad] = useState('');
+  // También usaremos strings en los campos de descuento
+  const [descuentoCantidadStr, setDescuentoCantidadStr] = useState('');
   const [descuentoMotivo, setDescuentoMotivo] = useState('');
   const [descuentoLote, setDescuentoLote] = useState<Lote | null>(null);
 
@@ -175,7 +175,7 @@ export default function Inventario() {
       // 2) Obtenemos la lista completa de productos
       const [inv, prodList] = await Promise.all([
         window.electronAPI.getInventoryGrouped(),
-        window.electronAPI.getProducts(),
+        window.electronAPI.getProducts()
       ]);
 
       setInventory(inv || []);
@@ -195,7 +195,7 @@ export default function Inventario() {
     setProductoId(0);
     setLote('');
     setFechaCaducidad('');
-    setCantidadActual(0);
+    setCantidadStr('');
     setOpenModal(true);
   }
 
@@ -204,7 +204,9 @@ export default function Inventario() {
     setProductoId(l.productoId);
     setLote(l.lote ?? '');
     setFechaCaducidad(l.fechaCaducidad ?? '');
-    setCantidadActual(l.cantidadActual ?? 0);
+    // Convertimos la cantidad a string
+    const cant = l.cantidadActual ?? 0;
+    setCantidadStr(String(cant));
     setOpenModal(true);
   }
 
@@ -225,14 +227,17 @@ export default function Inventario() {
         try {
           if (!window.electronAPI) return;
 
+          // Convierto el string a número con parseFloat
+          const cant = parseFloat(cantidadStr) || 0;
+
           if (!isEdit) {
             // Crear
             const resp = await window.electronAPI.createLote({
               productoId,
               lote,
               fechaCaducidad: fechaCaducidad || null,
-              cantidadActual,
-              activo: true,
+              cantidadActual: cant,
+              activo: true
             });
             if (!resp?.success) {
               alert('No se pudo crear el lote.');
@@ -244,8 +249,8 @@ export default function Inventario() {
               productoId,
               lote,
               fechaCaducidad: fechaCaducidad || null,
-              cantidadActual,
-              activo: true,
+              cantidadActual: cant,
+              activo: true
             });
             if (!resp?.success) {
               alert('No se pudo actualizar el lote.');
@@ -277,7 +282,7 @@ export default function Inventario() {
             lote: l.lote,
             fechaCaducidad: l.fechaCaducidad || null,
             cantidadActual: l.cantidadActual || 0,
-            activo: false,
+            activo: false
           });
           if (!resp?.success) {
             alert('No se pudo desactivar el lote.');
@@ -297,7 +302,7 @@ export default function Inventario() {
   // =========================
   function handleOpenDescuento(l: Lote) {
     setDescuentoLote(l);
-    setDescuentoCantidad('');
+    setDescuentoCantidadStr('');
     setDescuentoMotivo('');
     setDescuentoOpen(true);
   }
@@ -305,13 +310,13 @@ export default function Inventario() {
   function handleCloseDescuento() {
     setDescuentoOpen(false);
     setDescuentoLote(null);
-    setDescuentoCantidad('');
+    setDescuentoCantidadStr('');
     setDescuentoMotivo('');
   }
 
   async function handleConfirmDescuento() {
     if (!descuentoLote) return;
-    const cant = parseFloat(descuentoCantidad) || 0;
+    const cant = parseFloat(descuentoCantidadStr) || 0;
     if (cant <= 0) {
       alert('La cantidad a descontar debe ser mayor a 0.');
       return;
@@ -325,7 +330,7 @@ export default function Inventario() {
           const resp = await window.electronAPI.descontarPorConsumo({
             loteId: descuentoLote.id!,
             cantidad: cant,
-            motivo: descuentoMotivo,
+            motivo: descuentoMotivo
           });
           if (!resp?.success) {
             alert('No se pudo descontar.');
@@ -359,7 +364,7 @@ export default function Inventario() {
   //  Expandir / Colapsar filas
   // =========================
   function toggleProductRow(prodId: number) {
-    setOpenProductId((prev) => (prev === prodId ? null : prodId));
+    setOpenProductId(prev => (prev === prodId ? null : prodId));
   }
 
   // =========================
@@ -384,7 +389,7 @@ export default function Inventario() {
           borderRadius: 2,
           boxShadow: 3,
           backgroundColor: '#1c2430',
-          color: '#fff',
+          color: '#fff'
         }}
       >
         <CardHeader
@@ -396,7 +401,7 @@ export default function Inventario() {
           sx={{
             backgroundColor: '#343a40',
             borderRadius: '8px 8px 0 0',
-            pb: 1,
+            pb: 1
           }}
           action={
             <Button
@@ -415,14 +420,14 @@ export default function Inventario() {
             component={Paper}
             sx={{
               borderRadius: '0 0 8px 8px',
-              backgroundColor: '#2b3640',
+              backgroundColor: '#2b3640'
             }}
           >
             <Table>
               <TableHead
                 sx={{
                   backgroundColor: '#25303a',
-                  '& th': { color: '#fff' },
+                  '& th': { color: '#fff' }
                 }}
               >
                 <TableRow>
@@ -447,8 +452,8 @@ export default function Inventario() {
                         sx={{
                           cursor: 'pointer',
                           '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.05)',
-                          },
+                            backgroundColor: 'rgba(255,255,255,0.05)'
+                          }
                         }}
                       >
                         <TableCell sx={{ width: 50 }}>
@@ -461,7 +466,7 @@ export default function Inventario() {
                             sx={{
                               color: '#fff',
                               fontSize: '0.85rem',
-                              ml: 1,
+                              ml: 1
                             }}
                           >
                             {infoExtra}
@@ -473,7 +478,7 @@ export default function Inventario() {
                               color: stockColor,
                               fontSize: '0.85rem',
                               ml: 2,
-                              fontWeight: 'bold',
+                              fontWeight: 'bold'
                             }}
                           >
                             {stockLabel}
@@ -494,7 +499,7 @@ export default function Inventario() {
                                 sx={{
                                   color: '#fff',
                                   fontWeight: 'bold',
-                                  mb: 1,
+                                  mb: 1
                                 }}
                               >
                                 Lotes de {product.nombre}
@@ -504,7 +509,9 @@ export default function Inventario() {
                                   <TableRow>
                                     <TableCell sx={{ color: '#fff' }}>ID</TableCell>
                                     <TableCell sx={{ color: '#fff' }}>Lote</TableCell>
-                                    <TableCell sx={{ color: '#fff' }}>Fecha Caducidad</TableCell>
+                                    <TableCell sx={{ color: '#fff' }}>
+                                      Fecha Caducidad
+                                    </TableCell>
                                     <TableCell sx={{ color: '#fff' }}>Cantidad</TableCell>
                                     <TableCell sx={{ color: '#fff' }}>Actualizado</TableCell>
                                     <TableCell sx={{ color: '#fff' }}>Acciones</TableCell>
@@ -527,8 +534,8 @@ export default function Inventario() {
                                         key={l.id}
                                         sx={{
                                           '&:hover': {
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
-                                          },
+                                            backgroundColor: 'rgba(255,255,255,0.05)'
+                                          }
                                         }}
                                       >
                                         <TableCell sx={{ color: '#fff' }}>
@@ -625,7 +632,7 @@ export default function Inventario() {
         fullWidth
         maxWidth="sm"
         BackdropProps={{
-          style: { backdropFilter: 'blur(6px)' },
+          style: { backdropFilter: 'blur(6px)' }
         }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>
@@ -638,7 +645,7 @@ export default function Inventario() {
             <InputLabel id="prod-select-label">Producto</InputLabel>
             <Select
               labelId="prod-select-label"
-              value={productoId || ''}
+              value={productoId || 0}
               label="Producto"
               onChange={(e) => setProductoId(Number(e.target.value))}
             >
@@ -665,23 +672,15 @@ export default function Inventario() {
             InputLabelProps={{ shrink: true }}
             fullWidth
           />
+          {/* Campo Cantidad manejado como string */}
           <TextField
             label="Cantidad"
-            type="number"
-            value={cantidadActual === 0 ? '' : cantidadActual}
+            type="text"
+            value={cantidadStr}
             onChange={(e) => {
-              const val = e.target.value;
-              setCantidadActual(val === '' ? 0 : Number(val));
-            }}
-            inputMode="numeric"
-            InputProps={{
-              inputProps: {
-                pattern: '[0-9]*',
-                style: {
-                  MozAppearance: 'textfield',
-                  WebkitAppearance: 'none',
-                },
-              },
+              // Filtramos: solo dígitos y punto (si lo deseas)
+              const val = e.target.value.replace(/[^\d.]/g, '');
+              setCantidadStr(val);
             }}
             fullWidth
           />
@@ -711,16 +710,21 @@ export default function Inventario() {
         maxWidth="xs"
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Descontar / Merma</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <DialogContent
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}
+        >
           <Typography variant="body2">
             Ingresa la cantidad a descontar (por consumo interno, merma, etc.)
             y un motivo opcional.
           </Typography>
           <TextField
             label="Cantidad a descontar"
-            type="number"
-            value={descuentoCantidad}
-            onChange={(e) => setDescuentoCantidad(e.target.value)}
+            type="text"
+            value={descuentoCantidadStr}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^\d.]/g, '');
+              setDescuentoCantidadStr(val);
+            }}
           />
           <TextField
             label="Motivo (opcional)"

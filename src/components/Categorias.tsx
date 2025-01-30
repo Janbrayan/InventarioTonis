@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
-// Interfaz local (puedes ajustarla al gusto)
+/** Interfaz de Categoría; ajústala si necesitas más campos */
 interface Category {
   id?: number;
   nombre: string;
@@ -31,7 +31,7 @@ interface Category {
   updatedAt?: string;
 }
 
-// Diálogo de confirmación genérico
+/** Props del Diálogo de Confirmación Genérico */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -40,6 +40,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
+/** Componente de Diálogo de Confirmación */
 function ConfirmDialog({
   open,
   title,
@@ -53,7 +54,6 @@ function ConfirmDialog({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      // === Desenfocar fondo cuando se abre este Dialog
       BackdropProps={{
         style: {
           backdropFilter: 'blur(6px)'
@@ -98,6 +98,7 @@ export default function Categorias() {
   async function fetchCategories() {
     try {
       setLoading(true);
+      // Llamamos a nuestra API para obtener categorías
       const resp = await window.electronAPI.getCategories();
       setCategories(resp || []);
     } catch (error) {
@@ -107,7 +108,7 @@ export default function Categorias() {
     }
   }
 
-  // Abrir modal para Crear
+  // ========== MANEJO DEL MODAL CREAR/EDITAR ==========
   function handleOpenCreate() {
     setEditingCat(null);
     setNombre('');
@@ -115,7 +116,6 @@ export default function Categorias() {
     setOpenModal(true);
   }
 
-  // Abrir modal para Editar
   function handleOpenEdit(cat: Category) {
     setEditingCat(cat);
     setNombre(cat.nombre);
@@ -128,7 +128,7 @@ export default function Categorias() {
     setEditingCat(null);
   }
 
-  // Diálogo confirm
+  // ========== DIÁLOGO DE CONFIRMACIÓN ==========
   function openConfirmDialog(title: string, message: string, action: () => void) {
     setConfirmTitle(title);
     setConfirmMessage(message);
@@ -139,7 +139,7 @@ export default function Categorias() {
     setConfirmOpen(false);
   }
 
-  // Guardar (crear o editar)
+  // ========== GUARDAR (CREAR O EDITAR) ==========
   async function handleSaveCategory() {
     setOpenModal(false);
     const isEdit = !!editingCat;
@@ -151,6 +151,7 @@ export default function Categorias() {
       async () => {
         try {
           if (!window.electronAPI) return;
+
           if (!isEdit) {
             // Crear
             const result = await window.electronAPI.createCategory({
@@ -181,7 +182,7 @@ export default function Categorias() {
     );
   }
 
-  // Eliminar
+  // ========== ELIMINAR ==========
   function handleDeleteCategory(cat: Category) {
     openConfirmDialog(
       'Confirmar eliminación',
@@ -203,6 +204,7 @@ export default function Categorias() {
     );
   }
 
+  // Render principal
   if (loading) {
     return <p>Cargando categorías...</p>;
   }
@@ -213,7 +215,6 @@ export default function Categorias() {
         Gestión de Categorías
       </Typography>
 
-      {/* Card estilo dark */}
       <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
         <CardHeader
           title={
@@ -239,9 +240,17 @@ export default function Categorias() {
           }
         />
         <CardContent sx={{ p: 0 }}>
-          <TableContainer component={Paper} sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}>
+          <TableContainer
+            component={Paper}
+            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+          >
             <Table>
-              <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
+              <TableHead
+                sx={{
+                  backgroundColor: '#25303a',
+                  '& th': { color: '#fff' },
+                }}
+              >
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>Nombre</TableCell>
@@ -256,13 +265,18 @@ export default function Categorias() {
                     key={cat.id}
                     sx={{
                       '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.05)'
-                      }
+                        backgroundColor: 'rgba(255,255,255,0.05)',
+                      },
                     }}
                   >
                     <TableCell sx={{ color: '#fff' }}>{cat.id}</TableCell>
                     <TableCell sx={{ color: '#fff' }}>{cat.nombre}</TableCell>
-                    <TableCell sx={{ color: cat.activo ? '#28a745' : '#dc3545', fontWeight: 'bold' }}>
+                    <TableCell
+                      sx={{
+                        color: cat.activo ? '#28a745' : '#dc3545',
+                        fontWeight: 'bold',
+                      }}
+                    >
                       {cat.activo ? 'Sí' : 'No'}
                     </TableCell>
                     <TableCell sx={{ color: '#fff' }}>
@@ -311,7 +325,6 @@ export default function Categorias() {
         onClose={handleCloseModal}
         fullWidth
         maxWidth="sm"
-        // === Blur para el fondo al abrir este Dialog
         BackdropProps={{
           style: {
             backdropFilter: 'blur(6px)'
@@ -324,12 +337,14 @@ export default function Categorias() {
         <DialogContent sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             label="Nombre"
+            // type="text" deja teclear libremente
+            type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             fullWidth
           />
 
-          {/* Ejemplo de switch para "activo" */}
+          {/* Switch para "activo" */}
           <FormControlLabel
             control={
               <Switch
