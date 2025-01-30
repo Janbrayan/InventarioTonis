@@ -201,6 +201,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   historialGetVentasByRange: (range: 'day' | 'week' | 'month' | 'all') =>
     ipcRenderer.invoke('historial-getVentasByRange', range),
 
+  // (NUEVO) Obtener productos sin ventas en un rango
+  historialGetProductosNoVendidos: (fechaInicio: string, fechaFin: string) =>
+    ipcRenderer.invoke('historial-getProductosNoVendidos', fechaInicio, fechaFin),
+
   // ========== DASHBOARD ==========
   dashboardGetMetrics: () => ipcRenderer.invoke('dashboard-getMetrics'),
   dashboardGetResumenCompras: () => ipcRenderer.invoke('dashboard-getResumenCompras'),
@@ -216,7 +220,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dashboardGetLotesProxVencimiento: (days?: number, limit?: number) =>
     ipcRenderer.invoke('dashboard-getLotesProxVencimiento', days, limit),
 
-  // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
+  // ========== VENTAS ESTADÍSTICAS ==========
   ventasStatsGetTotalVentas: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('ventasStats-getTotalVentas', fechaInicio, fechaFin),
   ventasStatsGetNumVentas: (fechaInicio?: string, fechaFin?: string) =>

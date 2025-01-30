@@ -11,7 +11,7 @@ import { StatsService } from './services/StatsService';
 import { HistorialVentasService } from './services/HistorialVentasService';
 // Dashboard
 import { dashboardService } from './services/dashboardService';
-// (NUEVO) VentasEstadisticasService:
+// VentasEstadisticasService (estadísticas de ventas)
 import { VentasEstadisticasService } from './services/VentasEstadisticasService';
 
 export function setupIpcHandlers() {
@@ -477,6 +477,18 @@ export function setupIpcHandlers() {
     }
   });
 
+  // (ELIMINADO el handle para getDetallesByVentaIdIncludingZero)
+
+  // (NUEVO) Manejo para obtener productos sin ventas en [fechaInicio, fechaFin]
+  ipcMain.handle('historial-getProductosNoVendidos', async (_event, fechaInicio: string, fechaFin: string) => {
+    try {
+      return await HistorialVentasService.getProductosNoVendidos(fechaInicio, fechaFin);
+    } catch (error) {
+      console.error('Error historial-getProductosNoVendidos:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle(
     'historial-getVentasByRange',
     async (_event, range: 'day' | 'week' | 'month' | 'all') => {
@@ -489,7 +501,7 @@ export function setupIpcHandlers() {
     }
   );
 
-  // ========== DASHBOARD (NUEVO) ==========
+  // ========== DASHBOARD ==========
   ipcMain.handle('dashboard-getMetrics', async () => {
     try {
       return dashboardService.getMetrics();

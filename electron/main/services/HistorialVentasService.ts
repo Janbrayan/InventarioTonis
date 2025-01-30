@@ -1,11 +1,12 @@
 // electron/main/services/HistorialVentasService.ts
+
 import db from '../db';
 
 interface DBHistorialVenta {
   id: number;
   total: number;
   observaciones: string | null;
-  createdAt: string;  // Usaremos estos para filtrar
+  createdAt: string;  // Se usa para filtrar
   updatedAt: string;
 }
 
@@ -21,6 +22,7 @@ export interface DetalleHistorialVenta {
   id?: number;
   ventaId?: number;
   productoId: number;
+  productName?: string;   // para mostrar el nombre de producto
   cantidad: number;
   precioUnitario: number;
   subtotal?: number;
@@ -28,6 +30,21 @@ export interface DetalleHistorialVenta {
   updatedAt?: string;
 }
 
+/** Estructura básica para un producto sin ventas en un rango. */
+export interface ProductoSinVentas {
+  productoId: number;
+  nombre: string;
+  codigoBarras?: string;
+  precioVenta?: number;
+}
+
+/**
+ * Servicio de Historial de Ventas, con métodos para:
+ * - listar ventas
+ * - filtrar por rango
+ * - obtener detalles (solo productos vendidos) de una venta
+ * - obtener productos sin ventas (rango de fechas)
+ */
 export class HistorialVentasService {
   /**
    * Retorna todas las ventas (usando createdAt como fecha de referencia).
@@ -88,11 +105,11 @@ export class HistorialVentasService {
           whereClauses.push(`DATE(createdAt) >= DATE('now', '-7 days')`);
           break;
         case 'month':
-          // Últimos 30 días (o podrías usar 'start of month')
+          // Últimos 30 días
           whereClauses.push(`DATE(createdAt) >= DATE('now', '-30 days')`);
           break;
         case 'all':
-          // Sin filtro, regresamos todo
+          // Sin filtro
           break;
       }
 
@@ -119,7 +136,8 @@ export class HistorialVentasService {
 
   /**
    * Retorna los detalles de una venta específica (por ventaId),
-   * usando la tabla detail_ventas.
+   * usando la tabla detail_ventas + JOIN products.
+   * => MUESTRA SOLO LOS PRODUCTOS VENDIDOS en esa venta.
    */
   static async getDetallesByVentaId(ventaId: number): Promise<DetalleHistorialVenta[]> {
     try {
@@ -138,12 +156,12 @@ export class HistorialVentasService {
         JOIN products p ON p.id = dv.productoId
         WHERE dv.ventaId = ?
       `).all(ventaId);
-  
+
       return rows.map((r: any) => ({
         id: r.id,
         ventaId: r.ventaId,
         productoId: r.productoId,
-        productName: r.productName,  // <-- Aquí
+        productName: r.productName,
         cantidad: r.cantidad,
         precioUnitario: r.precioUnitario,
         subtotal: r.subtotal,
@@ -155,5 +173,42 @@ export class HistorialVentasService {
       return [];
     }
   }
-  
+
+  /**
+   * Retorna la lista de productos que NO registraron ventas
+   * en el rango [desde, hasta] (filtrando por detail_ventas.createdAt).
+   * => LEFT JOIN + GROUP BY => los que suman 0 => no se vendieron.
+   */
+  static async getProductosNoVendidos(
+    desde: string,
+    hasta: string
+  ): Promise<ProductoSinVentas[]> {
+    try {
+      const rows = db.prepare(`
+        SELECT
+          p.id AS productoId,
+          p.nombre AS nombre,
+          p.codigoBarras AS codigoBarras,
+          p.precioVenta AS precioVenta,
+          SUM(IFNULL(dv.cantidad, 0)) AS totalVendida
+        FROM products p
+        LEFT JOIN detail_ventas dv
+          ON dv.productoId = p.id
+          AND dv.createdAt >= ?
+          AND dv.createdAt <= ?
+        GROUP BY p.id
+        HAVING totalVendida = 0
+      `).all(desde, hasta);
+
+      return rows.map((r: any) => ({
+        productoId: r.productoId,
+        nombre: r.nombre,
+        codigoBarras: r.codigoBarras || undefined,
+        precioVenta: r.precioVenta != null ? Number(r.precioVenta) : undefined
+      }));
+    } catch (error) {
+      console.error('Error getProductosNoVendidos:', error);
+      return [];
+    }
+  }
 }

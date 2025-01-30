@@ -16,8 +16,7 @@ import {
   TableBody,
   Paper
 } from '@mui/material';
-
-/** Importamos componentes de Recharts */
+/** Recharts */
 import {
   BarChart,
   Bar,
@@ -34,17 +33,12 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-/**
- * Componente que muestra estadísticas de ventas usando
- * las funciones "ventasStatsGetXXX" expuestas en window.electronAPI,
- * e incluye gráficas de Recharts.
- */
 export default function EstadisticasVentas() {
-  // Campos para el rango de fechas
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  // ====== Campos para el rango de fechas (estadísticas generales) ======
+  const [fechaInicio, setFechaInicio] = useState<string>('');
+  const [fechaFin, setFechaFin] = useState<string>('');
 
-  // Estados para los resultados
+  // ====== Estados de resultados de estadísticas ======
   const [totalVentas, setTotalVentas] = useState<number>(0);
   const [numVentas, setNumVentas] = useState<number>(0);
   const [productosMasVendidos, setProductosMasVendidos] = useState<Array<any>>([]);
@@ -54,17 +48,33 @@ export default function EstadisticasVentas() {
   const [ticketPromedio, setTicketPromedio] = useState<number>(0);
   const [gananciaBruta, setGananciaBruta] = useState<number>(0);
 
-  // Para mostrar u ocultar un "cargando"
-  const [loading, setLoading] = useState(false);
+  // ====== Estado de carga (loading) ======
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // ====== Productos sin ventas ======
+  const [productosNoVendidos, setProductosNoVendidos] = useState<Array<any>>([]);
+
+  // ====== Manejo de error local ======
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   /**
-   * Carga TODAS las estadísticas en un solo "disparo".
+   * Carga TODAS las estadísticas (gráficas + productos no vendidos)
+   * en un solo "disparo".
    */
   async function handleCargarEstadisticas() {
     try {
+      setErrorMsg(''); // limpiar error previo
+
+      // Validamos fechas
+      if (!fechaInicio || !fechaFin) {
+        throw new Error('Por favor, selecciona ambas fechas (Inicio y Fin).');
+      }
+      if (fechaFin < fechaInicio) {
+        throw new Error('La fecha fin no puede ser menor que la fecha inicio.');
+      }
+
       setLoading(true);
 
-      // Llamamos a nuestras funciones del IPC
       // 1) Total Ventas
       const tv = await window.electronAPI.ventasStatsGetTotalVentas(fechaInicio, fechaFin);
       setTotalVentas(tv);
@@ -74,62 +84,81 @@ export default function EstadisticasVentas() {
       setNumVentas(nv);
 
       // 3) Productos más vendidos
-      const pmv = await window.electronAPI.ventasStatsGetProductosMasVendidos(fechaInicio, fechaFin, 5);
+      const pmv = await window.electronAPI.ventasStatsGetProductosMasVendidos(
+        fechaInicio, fechaFin, 5
+      );
       setProductosMasVendidos(pmv);
 
       // 4) Productos menos vendidos
-      const pmnv = await window.electronAPI.ventasStatsGetProductosMenosVendidos(fechaInicio, fechaFin, 5);
+      const pmnv = await window.electronAPI.ventasStatsGetProductosMenosVendidos(
+        fechaInicio, fechaFin, 5
+      );
       setProductosMenosVendidos(pmnv);
 
       // 5) Ventas por categoría
-      const vpc = await window.electronAPI.ventasStatsGetVentasPorCategoria(fechaInicio, fechaFin);
+      const vpc = await window.electronAPI.ventasStatsGetVentasPorCategoria(
+        fechaInicio, fechaFin
+      );
       setVentasPorCategoria(vpc);
 
       // 6) Ventas por día
-      const vpd = await window.electronAPI.ventasStatsGetVentasPorDia(fechaInicio, fechaFin);
+      const vpd = await window.electronAPI.ventasStatsGetVentasPorDia(
+        fechaInicio, fechaFin
+      );
       setVentasPorDia(vpd);
 
       // 7) Ticket promedio
-      const tp = await window.electronAPI.ventasStatsGetTicketPromedio(fechaInicio, fechaFin);
+      const tp = await window.electronAPI.ventasStatsGetTicketPromedio(
+        fechaInicio, fechaFin
+      );
       setTicketPromedio(tp);
 
       // 8) Ganancia bruta
-      const gb = await window.electronAPI.ventasStatsGetGananciaBruta(fechaInicio, fechaFin);
+      const gb = await window.electronAPI.ventasStatsGetGananciaBruta(
+        fechaInicio, fechaFin
+      );
       setGananciaBruta(gb);
 
-    } catch (error) {
+      // 9) Productos sin ventas en ese rango
+      const dataNoVend = await window.electronAPI.historialGetProductosNoVendidos(
+        fechaInicio,
+        fechaFin
+      );
+      setProductosNoVendidos(dataNoVend || []);
+
+    } catch (error: any) {
       console.error('Error cargando estadísticas:', error);
-      alert('Ocurrió un error al cargar las estadísticas.');
+      // Manejamos error en un string local
+      setErrorMsg(error.message || 'Ocurrió un error al cargar las estadísticas.');
     } finally {
       setLoading(false);
     }
   }
 
-  // Definimos colores para las gráficas
+  // Definimos colores para las gráficas de pastel
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8854d0'];
 
-  // Preparamos datos para la gráfica de pastel (Productos más vendidos)
-  // Recharts requiere un array con { name, value }
+  // ========== Transformación de datos para Recharts ==========
+
+  // Pastel: Productos Más Vendidos => { name, value }
   const dataPieMasVendidos = productosMasVendidos.map((item: any) => ({
     name: item.productName,
     value: item.cantidadVendida
   }));
 
-  // Preparamos datos para la gráfica de pastel (Productos menos vendidos)
+  // Pastel: Productos Menos Vendidos => { name, value }
   const dataPieMenosVendidos = productosMenosVendidos.map((item: any) => ({
     name: item.productName,
     value: item.cantidadVendida
   }));
 
-  // Preparamos datos para la gráfica de barras (Ventas por categoría)
-  // Recharts pide un array con { name, uv } => adaptamos
+  // Barras: Ventas por Categoría => { name, total }
   const dataBarCategoria = ventasPorCategoria.map((cat: any) => ({
     name: cat.categoriaNombre,
     total: cat.totalCategoria
   }));
 
-  // Preparamos datos para la gráfica de línea (Ventas por día)
-  // Recharts pide un array con { name, uv } => adaptamos
+  // Línea: Ventas por Día => { name, total }
   const dataLinePorDia = ventasPorDia.map((d: any) => ({
     name: d.dia,
     total: d.totalDia
@@ -141,15 +170,36 @@ export default function EstadisticasVentas() {
         Estadísticas de Ventas
       </Typography>
 
-      {/* Card para seleccionar fechas */}
-      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      {/* ====== Si hay un error, lo mostramos ====== */}
+      {errorMsg && (
+        <Box sx={{ mb: 2, p: 2, border: '1px solid red', borderRadius: 1, color: 'red' }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+            Error: {errorMsg}
+          </Typography>
+        </Box>
+      )}
+
+      {/* ========== Card para seleccionar fechas (Estadísticas Generales) ========== */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
               Rango de Fechas
             </Typography>
           }
-          sx={{ backgroundColor: '#343a40', borderRadius: '8px 8px 0 0', pb: 1 }}
+          sx={{
+            backgroundColor: '#343a40',
+            borderRadius: '8px 8px 0 0',
+            pb: 1
+          }}
         />
         <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
@@ -170,26 +220,40 @@ export default function EstadisticasVentas() {
             sx={{ width: 180, backgroundColor: '#2b3640', borderRadius: 1 }}
             inputProps={{ style: { color: '#fff' } }}
           />
+
+          {/* Botón para cargar las estadísticas y productos no vendidos */}
           <Button
             variant="contained"
             onClick={handleCargarEstadisticas}
             disabled={loading}
             sx={{ fontWeight: 'bold' }}
           >
-            {loading ? 'Cargando...' : 'Cargar Estadísticas'}
+            {loading ? 'Cargando...' : 'Ver Estadísticas'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Muestra resultados principales */}
-      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      {/* ========== Resultados Generales ========== */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
               Resultados Generales
             </Typography>
           }
-          sx={{ backgroundColor: '#343a40', borderRadius: '8px 8px 0 0', pb: 1 }}
+          sx={{
+            backgroundColor: '#343a40',
+            borderRadius: '8px 8px 0 0',
+            pb: 1
+          }}
         />
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Typography>
@@ -207,10 +271,17 @@ export default function EstadisticasVentas() {
         </CardContent>
       </Card>
 
-      {/* GRAFICAS de pastel (Productos más y menos vendidos) */}
+      {/* ========== Gráficas de pastel (Productos más y menos vendidos) ========== */}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
         {/* Pastel: Productos Más Vendidos */}
-        <Card sx={{ flex: '1 1 300px', borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430' }}>
+        <Card
+          sx={{
+            flex: '1 1 300px',
+            borderRadius: 2,
+            boxShadow: 3,
+            backgroundColor: '#1c2430'
+          }}
+        >
           <CardHeader
             title={
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#fff' }}>
@@ -237,7 +308,10 @@ export default function EstadisticasVentas() {
                     label
                   >
                     {dataPieMasVendidos.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-mas-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -249,7 +323,14 @@ export default function EstadisticasVentas() {
         </Card>
 
         {/* Pastel: Productos Menos Vendidos */}
-        <Card sx={{ flex: '1 1 300px', borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430' }}>
+        <Card
+          sx={{
+            flex: '1 1 300px',
+            borderRadius: 2,
+            boxShadow: 3,
+            backgroundColor: '#1c2430'
+          }}
+        >
           <CardHeader
             title={
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#fff' }}>
@@ -276,7 +357,10 @@ export default function EstadisticasVentas() {
                     label
                   >
                     {dataPieMenosVendidos.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-menos-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -288,8 +372,15 @@ export default function EstadisticasVentas() {
         </Card>
       </Box>
 
-      {/* Gráfica de Barras: Ventas por Categoría */}
-      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430' }}>
+      {/* ========== Gráfica de Barras: Ventas por Categoría ========== */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#fff' }}>
@@ -318,8 +409,15 @@ export default function EstadisticasVentas() {
         </CardContent>
       </Card>
 
-      {/* Gráfica de Línea: Ventas por Día */}
-      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430' }}>
+      {/* ========== Gráfica de Línea: Ventas por Día ========== */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430'
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#fff' }}>
@@ -335,7 +433,10 @@ export default function EstadisticasVentas() {
             </Typography>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dataLinePorDia} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart
+                data={dataLinePorDia}
+                margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" stroke="#fff" />
                 <YAxis stroke="#fff" />
@@ -348,10 +449,60 @@ export default function EstadisticasVentas() {
         </CardContent>
       </Card>
 
-      {/* ======= Tablas: Comparte la misma data original (opcional) ======= */}
-      {/* Ejemplo de Tablas “Más Vendidos” / “Menos Vendidos” / “Ventas por Categoría” / “Ventas por Día” */}
-      {/* Si quieres, mantén o retira estas tablas si ya usas las gráficas */}
-      {/* ... (podrías omitir el resto de la UI tabular si quieres que sólo sean gráficas) */}
+      {/* ========== Sección para Productos sin Ventas (usa el mismo [fechaInicio, fechaFin]) ========== */}
+      <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              Productos sin Ventas (en las fechas seleccionadas)
+            </Typography>
+          }
+          sx={{
+            backgroundColor: '#343a40',
+            borderRadius: '8px 8px 0 0',
+            pb: 1
+          }}
+        />
+        <CardContent>
+          <TableContainer component={Paper} sx={{ borderRadius: '8px' }}>
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Producto</TableCell>
+                  <TableCell>Categoria</TableCell>
+                  <TableCell>Otras Columnas..</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {productosNoVendidos.map((prod: any, idx: number) => {
+                  return (
+                    <TableRow
+                      key={`prodNoVend-${idx}`}
+                      sx={{
+                        '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
+                      }}
+                    >
+                      <TableCell>{prod.id}</TableCell>
+                      <TableCell>{prod.nombre}</TableCell>
+                      <TableCell>{prod.categoriaNombre || '—'}</TableCell>
+                      <TableCell>...</TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {productosNoVendidos.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ color: '#fff' }}>
+                      (Sin datos de productos sin venta)
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Box>
   );
 }

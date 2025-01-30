@@ -178,14 +178,19 @@ declare global {
       }>;
 
       // ========== HISTORIAL VENTAS ==========
-
       historialGetAllVentas?: () => Promise<any>;
       historialGetDetallesByVentaId?: (ventaId: number) => Promise<any>;
       historialGetVentasByRange?: (
         range: 'day' | 'week' | 'month' | 'all'
       ) => Promise<any>;
 
+      // (ELIMINADO): historialGetDetallesByVentaIdIncludingZero
+
+      // (NUEVO) Obtener productos SIN ventas en [fechaInicio, fechaFin]
+      historialGetProductosNoVendidos: (fechaInicio: string, fechaFin: string) => Promise<any>;
+
       // ========== DASHBOARD ==========
+
       /** Obtiene métricas principales (totalProductos, totalProveedores, etc.) */
       dashboardGetMetrics: () => Promise<{
         totalProductos: number;
