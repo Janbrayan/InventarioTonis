@@ -37,7 +37,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 interface Product {
   id: number;
   nombre: string;
-  precioVenta?: number;
+  precioVenta?: number;  // Usado para inicializar precioLista
   stock?: number;
 }
 
@@ -49,16 +49,21 @@ interface Sale {
 }
 
 /** 
- * DetalleVenta:
- * - cantidad / precioUnitario: valor numérico
- * - cantidadStr / precioStr: cadenas que guardan exactamente lo que el usuario teclea
+ * DetalleVenta (frontend):
+ * - cantidad / descuentoManualFijo => numéricos
+ * - cantidadStr / descuentoStr => strings con lo que el usuario teclea
+ * - precioLista y precioUnitario => Solo lectura en la UI
  */
 interface DetalleVenta {
   productoId: number;
   cantidad: number;
   cantidadStr: string;
+  descuentoManualFijo: number;
+  descuentoStr: string;
+
+  // Campos solo lectura en la UI
+  precioLista: number;
   precioUnitario: number;
-  precioStr: string;
   subtotal: number;
 }
 
@@ -69,6 +74,7 @@ interface ConfirmDialogProps {
   message: string;
   onClose: () => void;
   onConfirm: () => void;
+  onCancelAction?: () => void;  // Acción opcional al “Cancelar”
 }
 
 function ConfirmDialog({
@@ -76,8 +82,17 @@ function ConfirmDialog({
   title,
   message,
   onClose,
-  onConfirm
+  onConfirm,
+  onCancelAction
 }: ConfirmDialogProps) {
+  // Si el usuario da “Cancelar”
+  function handleCancel() {
+    if (onCancelAction) {
+      onCancelAction();
+    }
+    onClose();
+  }
+
   return (
     <Dialog
       open={open}
@@ -96,7 +111,7 @@ function ConfirmDialog({
         <Typography whiteSpace="pre-line">{message}</Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
+        <Button onClick={handleCancel}>Cancelar</Button>
         <Button variant="contained" onClick={onConfirm}>
           Aceptar
         </Button>
@@ -111,7 +126,6 @@ interface AlertDialogProps {
   message: string;
   onClose: () => void;
 }
-
 function AlertDialog({ open, message, onClose }: AlertDialogProps) {
   return (
     <Dialog
@@ -149,9 +163,15 @@ function getStockColor(stock: number): 'error' | 'warning' | 'success' {
 /** Convierte un número a letras en español (versión resumida) */
 function numberToSpanish(num: number): string {
   if (num === 0) return 'cero';
-  // Aquí iría tu lógica más completa para convertir un número a texto en español.
-  // Ejemplo simplificado:
   return String(num);
+}
+
+/** Calcula la diferencia de días a la caducidad */
+function daysUntilExpiration(expDateStr: string): number {
+  const expDate = new Date(expDateStr + 'T23:59:59');
+  const now = new Date();
+  const diffMs = expDate.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
 export default function Ventas() {
@@ -165,7 +185,7 @@ export default function Ventas() {
   // Modal para crear una venta
   const [openModal, setOpenModal] = useState(false);
 
-  // Detalles de la venta en curso (arreglo de DetalleVenta)
+  // Detalles de la venta en curso
   const [detalles, setDetalles] = useState<DetalleVenta[]>([]);
 
   // Confirm Dialog
@@ -173,6 +193,7 @@ export default function Ventas() {
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
+  const [cancelAction, setCancelAction] = useState<() => void>();
 
   // Alert Dialog
   const [alertOpen, setAlertOpen] = useState(false);
@@ -190,6 +211,12 @@ export default function Ventas() {
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
+  /** 
+   * (NUEVO) Almacenar qué productos ya han mostrado alerta de caducidad
+   * dentro de esta venta, para no repetir la pregunta.
+   */
+  const [warnedProducts, setWarnedProducts] = useState<Set<number>>(() => new Set());
+
   /** ============== Alert helpers ============== */
   function openAlert(message: string) {
     setAlertMessage(message);
@@ -200,7 +227,7 @@ export default function Ventas() {
     setAlertMessage('');
   }
 
-  /** ============== Cargar datos (ventas y productos) ============== */
+  /** ============== Cargar datos (ventas + productos) ============== */
   useEffect(() => {
     fetchAll();
   }, []);
@@ -222,10 +249,7 @@ export default function Ventas() {
     }
   }
 
-  /**
-   * Efecto A: si el estado `pendingProductId` viene en location, lo transformamos en
-   * un `state` con `openModal: 'createSale'`.
-   */
+  // Efecto A: si pendingProductId viene en location, abrimos modal
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -241,9 +265,7 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate]);
 
-  /**
-   * Efecto B: si `openModal: 'createSale'` y hay un `productId`, abrimos el modal y agregamos producto
-   */
+  // Efecto B: si openModal==='createSale' y hay un productId => agregamos producto
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -252,7 +274,7 @@ export default function Ventas() {
           handleOpenCreate();
         }
         if (typeof st.productId === 'number') {
-          addProductById(st.productId);
+          addProductById(st.productId, 0);
         }
         navigate(location.pathname, { replace: true });
       }
@@ -261,72 +283,142 @@ export default function Ventas() {
 
   /** ============== Abrir/cerrar modal de crear venta ============== */
   function handleOpenCreate() {
-    // Reseteamos la venta
     setDetalles([]);
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
+
+    // Reset warnedProducts
+    setWarnedProducts(new Set());
   }
   function handleCloseModal() {
-    // Al cerrar, reseteamos todo
     setOpenModal(false);
     setDetalles([]);
     setPagoStr('');
     setCambio(0);
+
+    // Reset warnedProducts (para la siguiente venta)
+    setWarnedProducts(new Set());
   }
 
-  /** ============== Seleccionar producto manualmente ============== */
-  function handleChangeProducto(e: SelectChangeEvent<number>) {
-    const newProdId = Number(e.target.value);
-    if (newProdId) {
-      const foundProd = products.find((p) => p.id === newProdId);
-      if (foundProd && (foundProd.stock ?? 0) <= 0) {
-        openAlert('Debes agregar stock a este producto antes de venderlo.');
-        return;
-      }
+  /** checkCloseToExpiration => true si caduca en <=7 días */
+  async function checkCloseToExpiration(productId: number): Promise<boolean> {
+    try {
+      const expDateStr = await window.electronAPI.getEarliestLotExpiration(productId);
+      if (!expDateStr) return false;
+      const diffDays = new Date(expDateStr) ? daysUntilExpiration(expDateStr) : 999999;
+      return diffDays <= 7;
+    } catch (error) {
+      console.error('Error checkCloseToExpiration:', error);
+      return false;
     }
-    setSelProductoId(newProdId);
-    if (!newProdId) return;
-    addProductById(newProdId);
+  }
+
+  /** Seleccionar producto manualmente */
+  async function handleChangeProducto(e: SelectChangeEvent<number>) {
+    const newProdId = Number(e.target.value);
+    if (!newProdId) {
+      setSelProductoId(0);
+      return;
+    }
+
+    // Verificar stock
+    const foundProd = products.find((p) => p.id === newProdId);
+    if (foundProd && (foundProd.stock ?? 0) <= 0) {
+      openAlert('Debes agregar stock a este producto antes de venderlo.');
+      return;
+    }
+
+    // Revisar caducidad
+    const isNear = await checkCloseToExpiration(newProdId);
+    if (isNear) {
+      // (A) Si no se había mostrado la alerta en esta venta
+      if (!warnedProducts.has(newProdId)) {
+        const newSet = new Set(warnedProducts);
+
+        // Obtenemos info para mostrar en la alerta: nombre, stock
+        const prodName = foundProd?.nombre || `(ID=${newProdId})`;
+        const stockVal = foundProd?.stock || 0;
+        // Y cuántos están advertidos
+        const totalWarn = newSet.size + 1;
+
+        // Mensaje con nombre y stock
+        const msg = `El producto "${prodName}" (stock: ${stockVal}) está próximo a caducar.\nActualmente tienes ${totalWarn} producto(s) a punto de caducar.\n¿Deseas aplicar un descuento (5)?`;
+
+        openConfirmDialog(
+          'Producto próximo a caducar',
+          msg,
+          // OnConfirm => desc=5, lo marcamos en set
+          () => {
+            addProductById(newProdId, 5);
+            newSet.add(newProdId);
+            setWarnedProducts(newSet);
+            closeConfirmDialog();
+          },
+          // OnCancel => desc=0, también marcamos en set => no vuelve a preguntar
+          () => {
+            addProductById(newProdId, 0);
+            newSet.add(newProdId);
+            setWarnedProducts(newSet);
+          }
+        );
+      } else {
+        // (B) Ya se había advertido => no volver a preguntar
+        addProductById(newProdId, 5);
+      }
+    } else {
+      // No está cercano => desc=0
+      addProductById(newProdId, 0);
+    }
+
     setSelProductoId(0);
   }
 
-  /** ============== Agregar producto al carrito ============== */
-  function addProductById(productId: number) {
+  /** Agregar producto */
+  function addProductById(productId: number, descuentoFijo = 0) {
     const index = detalles.findIndex((r) => r.productoId === productId);
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+
+    const precioLista = prod.precioVenta ?? 0;
+    const precioFinal = precioLista - descuentoFijo;
+
     if (index >= 0) {
       // Ya existe => incrementar cantidad
       const copy = [...detalles];
       const row = copy[index];
       row.cantidad += 1;
       row.cantidadStr = String(row.cantidad);
+      row.descuentoManualFijo = descuentoFijo;
+      row.descuentoStr = String(descuentoFijo);
+      row.precioLista = precioLista;
+      row.precioUnitario = precioFinal;
       row.subtotal = row.cantidad * row.precioUnitario;
       setDetalles(copy);
     } else {
-      // Nuevo renglón
-      const prod = products.find((p) => p.id === productId);
-      if (!prod) return;
-      const precio = prod.precioVenta ?? 0;
+      // Nuevo
       const nuevo: DetalleVenta = {
-        productoId: productId,
+        productoId:productId,
         cantidad: 1,
         cantidadStr: '1',
-        precioUnitario: precio,
-        precioStr: String(precio),
-        subtotal: precio
+        descuentoManualFijo: descuentoFijo,
+        descuentoStr: String(descuentoFijo),
+        precioLista,
+        precioUnitario: precioFinal,
+        subtotal: precioFinal
       };
       setDetalles((prev) => [...prev, nuevo]);
     }
   }
 
-  /** ============== Eliminar renglón del carrito ============== */
+  /** Eliminar renglón */
   function removeRenglonDetalle(idx: number) {
     const copy = [...detalles];
     copy.splice(idx, 1);
     setDetalles(copy);
   }
 
-  /** ============== Manejar cambio de cantidad ============== */
+  /** Manejar cambio de cantidad */
   function handleChangeCantidad(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
@@ -334,8 +426,8 @@ export default function Ventas() {
     const inputValue = e.target.value;
     const copy = [...detalles];
     const row = copy[idx];
-
     row.cantidadStr = inputValue;
+
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
       row.cantidad = parsed;
@@ -344,30 +436,34 @@ export default function Ventas() {
     setDetalles(copy);
   }
 
-  /** ============== Manejar cambio de precio unitario ============== */
-  function handleChangePrecio(
+  /** Manejar cambio de descuento */
+  function handleChangeDescuento(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
   ) {
     const inputValue = e.target.value;
     const copy = [...detalles];
     const row = copy[idx];
+    row.descuentoStr = inputValue;
 
-    row.precioStr = inputValue;
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
-      row.precioUnitario = parsed;
+      row.descuentoManualFijo = parsed;
+      const prod = products.find((p) => p.id === row.productoId);
+      const precioLista = prod?.precioVenta ?? 0;
+      row.precioLista = precioLista;
+      row.precioUnitario = precioLista - parsed;
       row.subtotal = row.cantidad * row.precioUnitario;
     }
     setDetalles(copy);
   }
 
-  /** ============== Calcular total de la venta ============== */
+  /** Calcular total */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
 
-  /** ============== Pago/cambio ============== */
+  /** Manejar cambio de pago */
   function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const pagoNum = parseFloat(e.target.value) || 0;
     setPagoStr(e.target.value);
@@ -376,19 +472,17 @@ export default function Ventas() {
     setCambio(c > 0 ? c : 0);
   }
 
-  /** ============== Guardar Venta (con confirmación y detalles) ============== */
+  /** Guardar venta */
   async function handleSaveVenta() {
-    // 1) Validar que detalles no esté vacío
     if (detalles.length === 0) {
       openAlert('No puedes crear una venta sin productos.');
       return;
     }
 
     const total = calcularTotal();
-    // 2) Armar un mensaje con la info de la venta (productos, total, pago, cambio)
     const lineas = detalles.map((d, i) => {
-      const prodName = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
-      return `${i + 1}. ${prodName} (x${d.cantidad}) = $${d.subtotal.toFixed(2)}`;
+      const pn = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
+      return `${i + 1}. ${pn} (x${d.cantidad}, desc=$${d.descuentoManualFijo}) = $${d.subtotal.toFixed(2)}`;
     }).join('\n');
 
     const pagoNum = parseFloat(pagoStr) || 0;
@@ -399,7 +493,6 @@ export default function Ventas() {
       ? numberToSpanish(cambioInt) + (cambioInt === 1 ? ' peso' : ' pesos')
       : '';
 
-    // Mensaje a mostrar
     const infoVenta = `
 Información de la Venta:
 
@@ -413,7 +506,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
 ¿Deseas REALIZAR esta venta?
     `;
 
-    // 3) Preparamos la acción real
     const action = async () => {
       try {
         const saleData = {
@@ -421,7 +513,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
           detalles: detalles.map((d) => ({
             productoId: d.productoId,
             cantidad: d.cantidad,
-            precioUnitario: d.precioUnitario,
+            descuentoManualFijo: d.descuentoManualFijo,
           })),
         };
         const resp = await window.electronAPI.createSale(saleData);
@@ -442,28 +534,30 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
       }
     };
 
-    // 4) Abrimos confirm dialog con la info
-    openConfirmDialog(
-      'Confirmar Venta',
-      infoVenta,
-      action
-    );
-    // 5) Cerramos el modal de venta
+    openConfirmDialog('Confirmar Venta', infoVenta, action);
     setOpenModal(false);
   }
 
-  /** ============== Confirm Dialog Helpers ============== */
-  function openConfirmDialog(title: string, message: string, action: () => void) {
+  /** ========== Confirm Dialog Helpers ========== */
+  function openConfirmDialog(
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    onCancelAction?: () => void
+  ) {
     setConfirmTitle(title);
     setConfirmMessage(message);
-    setConfirmAction(() => action);
+    setConfirmAction(() => onConfirm);
+    setCancelAction(() => onCancelAction);
     setConfirmOpen(true);
   }
+
   function closeConfirmDialog() {
     setConfirmOpen(false);
+    setCancelAction(undefined);
   }
 
-  /** ============== Ver Detalles de Venta existente ============== */
+  /** Ver detalles de venta */
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -481,7 +575,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
     setViewVentaId(null);
   }
 
-  /** ============== Eliminar venta ============== */
+  /** Eliminar venta */
   function handleDeleteVenta(v: Sale) {
     openConfirmDialog(
       'Eliminar Venta',
@@ -505,7 +599,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
     );
   }
 
-  /** ============== Render principal ============== */
   if (loading) return <p>Cargando ventas...</p>;
 
   const total = calcularTotal();
@@ -651,7 +744,9 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                 <TableRow>
                   <TableCell>Producto</TableCell>
                   <TableCell>Cantidad</TableCell>
-                  <TableCell>PrecioUnit</TableCell>
+                  <TableCell>Descuento</TableCell>
+                  <TableCell>Precio Lista</TableCell>
+                  <TableCell>Precio Unit</TableCell>
                   <TableCell>Subtotal</TableCell>
                   <TableCell>Quitar</TableCell>
                 </TableRow>
@@ -671,15 +766,42 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                           sx={{ width: 60 }}
                         />
                       </TableCell>
+                      {/* Descuento editable */}
                       <TableCell>
                         <TextField
                           type="text"
-                          value={d.precioStr}
-                          onChange={(e) => handleChangePrecio(e, idx)}
+                          value={d.descuentoStr}
+                          onChange={(e) => handleChangeDescuento(e, idx)}
+                          sx={{ width: 60 }}
+                        />
+                      </TableCell>
+                      {/* PrecioLista (readonly) */}
+                      <TableCell>
+                        <TextField
+                          type="text"
+                          value={d.precioLista.toFixed(2)}
+                          InputProps={{ readOnly: true }}
                           sx={{ width: 80 }}
                         />
                       </TableCell>
-                      <TableCell>${d.subtotal.toFixed(2)}</TableCell>
+                      {/* PrecioUnitario (readonly) */}
+                      <TableCell>
+                        <TextField
+                          type="text"
+                          value={d.precioUnitario.toFixed(2)}
+                          InputProps={{ readOnly: true }}
+                          sx={{ width: 80 }}
+                        />
+                      </TableCell>
+                      {/* Subtotal (readonly) */}
+                      <TableCell>
+                        <TextField
+                          type="text"
+                          value={d.subtotal.toFixed(2)}
+                          InputProps={{ readOnly: true }}
+                          sx={{ width: 80 }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="contained"
@@ -695,7 +817,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                 })}
                 {detalles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={7} align="center">
                       (Sin productos)
                     </TableCell>
                   </TableRow>
@@ -707,7 +829,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
           {/* Pago / cambio */}
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-              Total: ${total.toFixed(2)}
+              Total: ${calcularTotal().toFixed(2)}
             </Typography>
             <TextField
               label="Pago del cliente"
@@ -716,13 +838,13 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
               onChange={handlePagoChange}
               sx={{ width: 120 }}
             />
-            {cambioNum > 0 && (
+            {cambio > 0 && (
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                  Cambio: ${cambioNum.toFixed(2)}
+                  Cambio: ${cambio.toFixed(2)}
                 </Typography>
                 <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
-                  ({cambioEnLetra})
+                  ({cambioInt > 0 ? numberToSpanish(cambioInt) : ''} {cambioInt === 1 ? 'peso' : 'pesos'})
                 </Typography>
               </Box>
             )}
@@ -730,7 +852,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseModal}>Cancelar</Button>
-          {/* Cambiamos a "Realizar Venta" */}
           <Button variant="contained" onClick={handleSaveVenta}>
             Realizar Venta
           </Button>
@@ -805,6 +926,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         message={confirmMessage}
         onClose={closeConfirmDialog}
         onConfirm={confirmAction}
+        onCancelAction={cancelAction}
       />
 
       {/* ============== Alert Dialog ============== */}

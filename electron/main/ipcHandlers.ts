@@ -15,7 +15,7 @@ import { dashboardService } from './services/dashboardService';
 import { VentasEstadisticasService } from './services/VentasEstadisticasService';
 
 export function setupIpcHandlers() {
-  // ========== LOGIN ==========
+  // ========== LOGIN ==========  
   ipcMain.handle('login-user', async (_event, { username, password }) => {
     try {
       const result = await UserService.loginUser(username, password);
@@ -337,6 +337,16 @@ export function setupIpcHandlers() {
     }
   });
 
+  // (NUEVO) ======== get-earliest-lot-expiration ========
+  ipcMain.handle('get-earliest-lot-expiration', async (_event, productId: number) => {
+    try {
+      return await SalesService.getEarliestLotExpiration(productId);
+    } catch (error) {
+      console.error('Error get-earliest-lot-expiration:', error);
+      return null;
+    }
+  });
+
   // ========== STATS ==========
   ipcMain.handle(
     'stats-getTotalComprasPorFecha',
@@ -641,10 +651,7 @@ export function setupIpcHandlers() {
     'ventasStats-getVentasPorCategoria',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
       try {
-        return VentasEstadisticasService.getVentasPorCategoria(
-          fechaInicio || '',
-          fechaFin || ''
-        );
+        return VentasEstadisticasService.getVentasPorCategoria(fechaInicio || '', fechaFin || '');
       } catch (error) {
         console.error('Error ventasStats-getVentasPorCategoria:', error);
         return [];
@@ -656,10 +663,7 @@ export function setupIpcHandlers() {
     'ventasStats-getVentasPorDia',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
       try {
-        return VentasEstadisticasService.getVentasPorDia(
-          fechaInicio || '',
-          fechaFin || ''
-        );
+        return VentasEstadisticasService.getVentasPorDia(fechaInicio || '', fechaFin || '');
       } catch (error) {
         console.error('Error ventasStats-getVentasPorDia:', error);
         return [];
@@ -671,10 +675,7 @@ export function setupIpcHandlers() {
     'ventasStats-getTicketPromedio',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
       try {
-        return VentasEstadisticasService.getTicketPromedio(
-          fechaInicio || '',
-          fechaFin || ''
-        );
+        return VentasEstadisticasService.getTicketPromedio(fechaInicio || '', fechaFin || '');
       } catch (error) {
         console.error('Error ventasStats-getTicketPromedio:', error);
         return 0;
@@ -686,10 +687,7 @@ export function setupIpcHandlers() {
     'ventasStats-getGananciaBruta',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
       try {
-        return VentasEstadisticasService.getGananciaBruta(
-          fechaInicio || '',
-          fechaFin || ''
-        );
+        return VentasEstadisticasService.getGananciaBruta(fechaInicio || '', fechaFin || '');
       } catch (error) {
         console.error('Error ventasStats-getGananciaBruta:', error);
         return 0;

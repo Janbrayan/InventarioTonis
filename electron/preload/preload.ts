@@ -237,4 +237,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ventasStats-getTicketPromedio', fechaInicio, fechaFin),
   ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('ventasStats-getGananciaBruta', fechaInicio, fechaFin),
+
+  // ========== (NUEVO) Función para fecha de caducidad ==========
+  getEarliestLotExpiration: (productId: number) =>
+    ipcRenderer.invoke('get-earliest-lot-expiration', productId),
 });

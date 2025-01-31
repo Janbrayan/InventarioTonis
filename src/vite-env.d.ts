@@ -187,7 +187,10 @@ declare global {
       // (ELIMINADO): historialGetDetallesByVentaIdIncludingZero
 
       // (NUEVO) Obtener productos SIN ventas en [fechaInicio, fechaFin]
-      historialGetProductosNoVendidos: (fechaInicio: string, fechaFin: string) => Promise<any>;
+      historialGetProductosNoVendidos: (
+        fechaInicio: string,
+        fechaFin: string
+      ) => Promise<any>;
 
       // ========== DASHBOARD ==========
 
@@ -323,6 +326,9 @@ declare global {
       >;
       ventasStatsGetTicketPromedio: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
       ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+
+      // (NUEVO) Para obtener la caducidad más próxima de un producto
+      getEarliestLotExpiration: (productId: number) => Promise<string | null>;
     }
   }
 }

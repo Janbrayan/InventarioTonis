@@ -1,6 +1,7 @@
 // electron/main/services/SalesService.ts
+
 import db from '../db';
-import { getHoraLocalCDMX } from '../utils/dateUtils'; // <-- Importamos la función
+import { getHoraLocalCDMX } from '../utils/dateUtils';
 
 /** Interfaz del encabezado de la Venta */
 export interface Sale {
@@ -18,30 +19,77 @@ export interface DetalleVenta {
   id?: number;
   ventaId?: number;
   productoId: number;
-  cantidad: number;           // Nº de cajas/paquetes/unidades vendidas
-  precioUnitario: number;
+  cantidad: number;           // Nº de contenedores (cajas/paquetes/unidades)
+
+  // ============== Campos para manejo de precio y descuento =============
+  descuentoManualFijo?: number;  // Lo que el front envía (0 si no hay descuento)
+  precioUnitario: number;        // Se recalculará en el service
   subtotal?: number;
-  lote?: string;              // si quieres enlazar a un Lote en particular
+
+  lote?: string;                 // Para enlazar con un Lote específico si gustas
   fechaCaducidad?: string;
 
   tipoContenedor?: 'unidad' | 'caja' | 'paquete';
-  unidadesPorContenedor?: number;
-  piezasVendidas?: number;    // total de piezas que realmente se venden
+  unidadesPorContenedor?: number; // Cuántas unidades lleva cada caja o paquete
+  piezasVendidas?: number;        // total de piezas vendidas (se calcula)
 }
 
 /**
- * Interfaz para la fila del Lote (solo las propiedades que uses).
- * Para FEFO, necesitamos al menos `fechaCaducidad` y `cantidadActual`.
+ * Interfaz para la fila del Lote (para FEFO).
+ * Usada al descontar stock en 'lotes' y para obtener la caducidad.
  */
 interface DBLoteRow {
   id: number;
   cantidadActual: number;
+  fechaCaducidad: string | null; // puede ser null en la BD
+  // ... si gustas, agrega más campos
+}
+
+/**
+ * Interfaz para la fila que solo devuelve 'fechaCaducidad'
+ * en getEarliestLotExpiration (línea del SELECT).
+ */
+interface LoteExpDateRow {
   fechaCaducidad: string | null;
-  // ... si gustas, agrega más campos como "activo", "lote", etc.
 }
 
 export class SalesService {
-  /** Listar todas las ventas (encabezado). */
+  /** =========================================================
+   *  1) OBTENER LOT CON CADUCIDAD PRÓXIMA
+   *  =========================================================
+   *  Retorna la fecha de caducidad más próxima (YYYY-MM-DD) de los lotes
+   *  activos, con stock > 0 y fechaCaducidad no nula,
+   *  o null si no hay ninguno.
+   */
+  static async getEarliestLotExpiration(productId: number): Promise<string | null> {
+    try {
+      // Hacemos un cast a LoteExpDateRow | undefined
+      const row = db.prepare(`
+        SELECT fechaCaducidad
+        FROM lotes
+        WHERE productoId = ?
+          AND activo = 1
+          AND cantidadActual > 0
+          AND fechaCaducidad IS NOT NULL
+        ORDER BY fechaCaducidad ASC
+        LIMIT 1
+      `).get(productId) as LoteExpDateRow | undefined;
+
+      // Verificamos si hay fila y si la fechaCaducidad no es nula
+      if (!row || !row.fechaCaducidad) {
+        return null;
+      }
+      // row.fechaCaducidad podría venir como "YYYY-MM-DD" o "YYYY-MM-DD HH:mm:ss"
+      return row.fechaCaducidad.substring(0, 10); // solo "YYYY-MM-DD"
+    } catch (error) {
+      console.error('Error getEarliestLotExpiration:', error);
+      return null;
+    }
+  }
+
+  /** =========================================================
+   *  2) LISTAR TODAS LAS VENTAS
+   *  ========================================================= */
   static async getSales(): Promise<Sale[]> {
     try {
       const rows = db.prepare(`
@@ -65,11 +113,9 @@ export class SalesService {
     }
   }
 
-  /**
-   * (NUEVO) Listar solo las ventas **del día** (hora local).
-   * Filtra usando `substr(fecha,1,10) = date('now','localtime')`
-   * asumiendo `fecha` es tipo "YYYY-MM-DD HH:mm:ss".
-   */
+  /** =========================================================
+   *  3) LISTAR VENTAS DEL DÍA (HORA LOCAL)
+   *  ========================================================= */
   static async getSalesToday(): Promise<Sale[]> {
     try {
       const rows = db.prepare(`
@@ -94,15 +140,18 @@ export class SalesService {
     }
   }
 
-  /**
-   * Crear Venta (encabezado + detalles) + descontar lotes (FEFO),
-   * con verificación previa de stock para impedir venta si no hay existencias suficientes.
+  /** =========================================================
+   *  4) CREAR VENTA + DESCONTAR STOCK (FEFO)
+   *  =========================================================
+   *  - precioLista se toma de `products.precioVenta`
+   *  - descuentoManualFijo viene en `sale.detalles[x].descuentoManualFijo` (0 si no hay)
+   *  - precioUnitario = precioLista - descuentoManualFijo
    */
   static async createSale(sale: Sale): Promise<{ success: boolean; message?: string }> {
     // Hora local de México
     const now = getHoraLocalCDMX();
 
-    // =================== (NUEVO) Verificación previa de stock ===================
+    // ========= (A) Verificación previa de stock =========
     if (sale.detalles && sale.detalles.length > 0) {
       for (const det of sale.detalles) {
         // Calculamos cuántas “piezas” reales requiere este renglón
@@ -112,7 +161,7 @@ export class SalesService {
           piezasRequeridas = det.cantidad * upc;
         }
 
-        // Consultamos el stock total disponible en lotes activos para este producto
+        // Consultamos el stock total disponible en lotes activos
         const stockRow = db.prepare(`
           SELECT IFNULL(SUM(cantidadActual), 0) AS totalStock
           FROM lotes
@@ -132,8 +181,8 @@ export class SalesService {
         }
       }
     }
-    // =========================================================================
 
+    // ========== (B) Transacción para insertar venta y descontar lotes ==========
     const tx = db.transaction(() => {
       // 1) Insertar encabezado en 'sales'
       const fechaVenta = sale.fecha ?? now;
@@ -153,23 +202,38 @@ export class SalesService {
       if (sale.detalles && sale.detalles.length > 0) {
         const stmtDetalle = db.prepare(`
           INSERT INTO detail_ventas
-            (ventaId, productoId, cantidad, precioUnitario, subtotal,
+            (ventaId, productoId, cantidad,
+             precioLista, descuentoManualFijo, precioUnitario, subtotal,
              tipoContenedor, unidadesPorContenedor, piezasVendidas,
              lote, fechaCaducidad,
              createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const det of sale.detalles) {
-          // Subtotal según contenedores (ejemplo con 'paquete')
-          let sub = det.cantidad * det.precioUnitario;
-          if (det.tipoContenedor === 'paquete') {
-            const upc = det.unidadesPorContenedor ?? 1;
-            sub = det.cantidad * upc * det.precioUnitario;
-          }
-          // Si manejas 'caja', haz algo similar
+          // 2.1) Obtener el precioVenta actual => precioLista
+          const productRow = db.prepare(`
+            SELECT precioVenta
+            FROM products
+            WHERE id = ?
+          `).get(det.productoId) as { precioVenta: number } | undefined;
 
-          // piezasVendidas
+          const precioLista = productRow?.precioVenta ?? 0;
+
+          // 2.2) Tomar descuentoManualFijo del "det" (0 si no existe)
+          const descMan = det.descuentoManualFijo ?? 0;
+
+          // 2.3) Calcular precioUnit = precioLista - descMan
+          const precioUnit = precioLista - descMan;
+
+          // 2.4) Subtotal (considerando cajas/paquetes)
+          let sub = det.cantidad * precioUnit;
+          if (det.tipoContenedor === 'caja' || det.tipoContenedor === 'paquete') {
+            const upc = det.unidadesPorContenedor ?? 1;
+            sub = det.cantidad * upc * precioUnit;
+          }
+
+          // 2.5) PiezasVendidas (reales)
           let piezas = det.cantidad;
           if (det.tipoContenedor === 'caja' || det.tipoContenedor === 'paquete') {
             const upc = det.unidadesPorContenedor ?? 1;
@@ -180,15 +244,17 @@ export class SalesService {
             ventaId,
             det.productoId,
             det.cantidad,
-            det.precioUnitario,
+            precioLista,
+            descMan,
+            precioUnit,
             sub,
             det.tipoContenedor ?? null,
             det.unidadesPorContenedor ?? 1,
             piezas,
             det.lote ?? null,
             det.fechaCaducidad ?? null,
-            now,  // createdAt
-            now   // updatedAt
+            now, // createdAt
+            now  // updatedAt
           );
         }
       }
@@ -204,8 +270,9 @@ export class SalesService {
 
           let toDiscount = piezas;
 
-          // FEFO: ordenamos por fechaCaducidad ASC, luego id
+          // FEFO: ordenamos por fechaCaducidad ASC, luego id ASC
           while (toDiscount > 0) {
+            // Cast a DBLoteRow para que TS entienda fechaCaducidad, cantidadActual, etc.
             const loteRow = db.prepare(`
               SELECT
                 id,
@@ -248,17 +315,20 @@ export class SalesService {
       return { success: true };
     } catch (error: any) {
       console.error('Error createSale:', error);
-      // Retornamos un mensaje de error para poder mostrarlo en el front si se desea
       return { success: false, message: error.message };
     }
   }
 
-  /** Obtener detalles de una venta */
+  /** =========================================================
+   *  5) OBTENER DETALLES DE VENTA (detail_ventas)
+   *  ========================================================= */
   static async getDetallesByVentaId(ventaId: number): Promise<DetalleVenta[]> {
     try {
       const rows = db.prepare(`
         SELECT
-          id, ventaId, productoId, cantidad, precioUnitario, subtotal,
+          id, ventaId, productoId, cantidad,
+          precioLista, descuentoManualFijo,
+          precioUnitario, subtotal,
           tipoContenedor, unidadesPorContenedor, piezasVendidas,
           lote, fechaCaducidad,
           createdAt, updatedAt
@@ -266,13 +336,19 @@ export class SalesService {
         WHERE ventaId = ?
       `).all(ventaId);
 
+      // Mapeamos el resultado para encajar con la interfaz DetalleVenta
       return rows.map((r: any) => ({
         id: r.id,
         ventaId: r.ventaId,
         productoId: r.productoId,
         cantidad: r.cantidad,
+
+        // Nuevos campos
+        precioLista: r.precioLista,
+        descuentoManualFijo: r.descuentoManualFijo,
         precioUnitario: r.precioUnitario,
         subtotal: r.subtotal,
+
         tipoContenedor: r.tipoContenedor ?? undefined,
         unidadesPorContenedor: r.unidadesPorContenedor ?? undefined,
         piezasVendidas: r.piezasVendidas ?? undefined,

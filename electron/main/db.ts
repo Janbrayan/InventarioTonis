@@ -1,3 +1,4 @@
+// src/electron/main/db.ts
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -121,7 +122,7 @@ CREATE TABLE IF NOT EXISTS detail_compras (
   unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
   piezasIngresadas REAL DEFAULT 0,      -- total de piezas que realmente ingresan
 
-  precioPorPieza REAL DEFAULT 0,        -- Nueva columna añadida
+  precioPorPieza REAL DEFAULT 0,        -- para un manejo granular de costo
 
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
@@ -138,7 +139,7 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS lotes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   productoId INTEGER NOT NULL,
-  detalleCompraId INTEGER, -- opcional (si quieres enlazar con detail_compras)
+  detalleCompraId INTEGER, -- opcional (enlazar con detail_compras si se desea)
   lote TEXT,
   fechaCaducidad TEXT,
   cantidadActual REAL NOT NULL DEFAULT 0,
@@ -167,6 +168,12 @@ CREATE TABLE IF NOT EXISTS sales (
 // ==================================
 //   Tabla "detail_ventas" (detalle de ventas)
 // ==================================
+// NOTA: Aquí ya incluimos: 
+//       - precioLista (el precio normal sin descuento)
+//       - descuentoManualFijo (el descuento en pesos que aplica el vendedor)
+//       - precioUnitario (el precio final que pagó el cliente)
+//       - subtotal
+//       (El resto de campos son como antes.)
 db.exec(`
 CREATE TABLE IF NOT EXISTS detail_ventas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -174,14 +181,17 @@ CREATE TABLE IF NOT EXISTS detail_ventas (
   productoId INTEGER NOT NULL,
 
   cantidad REAL NOT NULL DEFAULT 0,
-  precioUnitario REAL NOT NULL DEFAULT 0,
-  subtotal REAL NOT NULL DEFAULT 0,
+
+  precioLista REAL NOT NULL DEFAULT 0,        -- Precio original sin descuento
+  descuentoManualFijo REAL NOT NULL DEFAULT 0,-- Descuento en pesos
+  precioUnitario REAL NOT NULL DEFAULT 0,     -- Precio final (precioLista - descuentoManualFijo)
+  subtotal REAL NOT NULL DEFAULT 0,           -- (precioUnitario * cantidad)
 
   tipoContenedor TEXT,                  -- 'unidad' | 'caja' | 'paquete'
-  unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja o paquete
-  piezasVendidas REAL DEFAULT 0,        -- total de piezas que se venden
+  unidadesPorContenedor REAL DEFAULT 1, -- cuántas unidades lleva cada caja/paquete
+  piezasVendidas REAL DEFAULT 0,        -- total de piezas vendidas
 
-  lote TEXT,            -- opcional, si quieres enlazar un Lote específico
+  lote TEXT,            -- opcional: enlazar un Lote específico
   fechaCaducidad TEXT,  -- opcional
 
   createdAt TEXT NOT NULL,
