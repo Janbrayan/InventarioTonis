@@ -281,8 +281,14 @@ declare global {
       >;
 
       // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
-      ventasStatsGetTotalVentas: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
-      ventasStatsGetNumVentas: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+      ventasStatsGetTotalVentas: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<number>;
+      ventasStatsGetNumVentas: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<number>;
       ventasStatsGetProductosMasVendidos: (
         fechaInicio?: string,
         fechaFin?: string,
@@ -324,11 +330,41 @@ declare global {
           totalDia: number;
         }>
       >;
-      ventasStatsGetTicketPromedio: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
-      ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) => Promise<number>;
+      ventasStatsGetTicketPromedio: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<number>;
+      ventasStatsGetGananciaBruta: (
+        fechaInicio?: string,
+        fechaFin?: string
+      ) => Promise<number>;
 
       // (NUEVO) Para obtener la caducidad más próxima de un producto
       getEarliestLotExpiration: (productId: number) => Promise<string | null>;
+
+      // ========== (NUEVO) CORTES (crear, obtener, generar PDF) ==========
+      createCorte: (
+        fechaInicio: string,
+        fechaFin: string,
+        usuarioId?: number,
+        montoEgresos?: number,
+        observaciones?: string
+      ) => Promise<{
+        success: boolean;
+        data?: any;
+        error?: string;
+      }>;
+
+      getCorteById: (corteId: number) => Promise<{
+        success: boolean;
+        data?: any;
+        error?: string;
+      }>;
+
+      generateCortePDF: (
+        corteData: any,
+        outputPath: string
+      ) => Promise<{ success: boolean; file?: string; error?: string }>;
     }
   }
 }

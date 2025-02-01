@@ -107,6 +107,24 @@ export interface FrontDetalleVenta {
   piezasVendidas?: number;
 }
 
+/**
+ * Interfaz para crear y leer cortes (cierre de caja) desde el frontend.
+ * Opcional, si quieres tipar los parámetros.
+ */
+export interface FrontCorte {
+  id?: number;
+  fechaCorte?: string;
+  fechaInicio: string;
+  fechaFin: string;
+  totalVentas?: number;
+  totalDescuentos?: number;
+  netoVentas?: number;
+  totalEgresos?: number;
+  saldoFinal?: number;
+  usuarioId?: number | null;
+  observaciones?: string;
+}
+
 // =========================
 //  Exponemos las funciones
 //  de IPC en `window.electronAPI`
@@ -241,4 +259,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ========== (NUEVO) Función para fecha de caducidad ==========
   getEarliestLotExpiration: (productId: number) =>
     ipcRenderer.invoke('get-earliest-lot-expiration', productId),
+
+  // ========== (NUEVO) CORTES (crear, obtener, generar PDF) ==========
+  createCorte: (
+    fechaInicio: string,
+    fechaFin: string,
+    usuarioId?: number,
+    montoEgresos?: number,
+    observaciones?: string
+  ) => ipcRenderer.invoke('create-corte', { fechaInicio, fechaFin, usuarioId, montoEgresos, observaciones }),
+
+  getCorteById: (corteId: number) => ipcRenderer.invoke('get-corte-by-id', corteId),
+
+  generateCortePDF: (corteData: FrontCorte, outputPath: string) =>
+    ipcRenderer.invoke('generate-corte-pdf', { corteData, outputPath }),
 });

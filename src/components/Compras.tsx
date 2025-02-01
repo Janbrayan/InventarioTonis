@@ -27,7 +27,7 @@ import {
 import {
   Add as AddIcon,
   Visibility as VisibilityIcon,
-} from '@mui/icons-material'; // <-- Se quita DeleteIcon de aquí
+} from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 /** =============== Tipos de datos básicos =============== */
@@ -39,11 +39,14 @@ interface Product {
   id: number;
   nombre: string;
 }
+
+type TipoContenedor = 'unidad' | 'caja' | 'paquete' | 'kilos';
+
 interface DetalleCompra {
   productoId: number;
   cantidad: number;
   precioUnitario: number;
-  tipoContenedor: 'unidad' | 'caja' | 'paquete';
+  tipoContenedor: TipoContenedor;
   unidadesPorContenedor?: number;
   lote?: string;
   fechaCaducidad?: string;
@@ -66,7 +69,7 @@ function generateRandomLote(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(Math.floor(Math.random() * Math.random() * chars.length));
   }
   // Por ejemplo: "LOTE-AB12CD"
   return 'LOTE-' + result;
@@ -146,6 +149,7 @@ interface DetalleModalProps {
   /** Si quieres preseleccionar un producto en el submodal */
   preselectedProductId?: number | null;
 }
+
 function DetalleModal({
   open,
   onClose,
@@ -156,7 +160,13 @@ function DetalleModal({
   const [productoId, setProductoId] = useState<number>(0);
   const [cantidad, setCantidad] = useState<number>(1);
   const [precioUnit, setPrecioUnit] = useState<number>(0);
-  const [tipoCont, setTipoCont] = useState<'unidad' | 'caja' | 'paquete'>('unidad');
+
+  /** Ajustamos para que incluya 'kilos' */
+  const [tipoCont, setTipoCont] = useState<TipoContenedor>('unidad');
+
+  // Nuevo state para el caso "kilos": total en pesos
+  const [totalKilos, setTotalKilos] = useState<number>(0);
+
   const [upc, setUpc] = useState<number>(1);
   const [lote, setLote] = useState('');
   const [caducidad, setCaducidad] = useState('');
@@ -165,14 +175,43 @@ function DetalleModal({
   // Estado para manejar error interno en este submodal
   const [error, setError] = useState('');
 
+  /** Para cambiar las etiquetas según el tipoContenedor */
+  const getPrecioUnitLabel = () => {
+    switch (tipoCont) {
+      case 'caja':
+        return 'Precio por Caja';
+      case 'paquete':
+        return 'Precio por Paquete';
+      case 'kilos':
+        return 'Precio por Kilo';
+      default:
+        return 'Precio Unitario'; // 'unidad'
+    }
+  };
+
+  const getUpcLabel = () => {
+    switch (tipoCont) {
+      case 'caja':
+        return 'Unid x Caja';
+      case 'paquete':
+        return 'Unid x Paquete';
+      default:
+        return 'Unid x Cont.';
+    }
+  };
+
   function handleConfirm() {
     // Validaciones
     if (!productoId) {
       setError('Selecciona un producto.');
       return;
     }
-    if (cantidad <= 0 || precioUnit <= 0) {
-      setError('Cantidad y precio deben ser mayores a 0.');
+    if (cantidad <= 0) {
+      setError('Cantidad debe ser mayor a 0.');
+      return;
+    }
+    if (precioUnit <= 0) {
+      setError('El Precio Unitario debe ser mayor a 0.');
       return;
     }
 
@@ -191,8 +230,9 @@ function DetalleModal({
   }
 
   // Al abrir el submodal, reseteamos (y generamos lote automáticamente)
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
+      setProductoId(preselectedProductId || 0);
       setCantidad(1);
       setPrecioUnit(0);
       setTipoCont('unidad');
@@ -201,14 +241,19 @@ function DetalleModal({
       setPrecioVenta(0);
       setLote(generateRandomLote());
       setError('');
-
-      if (preselectedProductId) {
-        setProductoId(preselectedProductId);
-      } else {
-        setProductoId(0);
-      }
+      setTotalKilos(0);
     }
   }, [open, preselectedProductId]);
+
+  // Si es "kilos", al cambiar "cantidad" o "totalKilos", calculamos precioUnit = totalKilos / cantidad
+  useEffect(() => {
+    if (tipoCont === 'kilos') {
+      if (cantidad > 0 && totalKilos > 0) {
+        const newPrice = totalKilos / cantidad;
+        setPrecioUnit(Number(newPrice.toFixed(2)));
+      }
+    }
+  }, [tipoCont, cantidad, totalKilos]);
 
   function handleCloseError() {
     setError('');
@@ -248,11 +293,23 @@ function DetalleModal({
             value={cantidad === 0 ? '' : cantidad}
             onChange={(e) => setCantidad(Number(e.target.value) || 0)}
           />
+
+          {tipoCont === 'kilos' && (
+            <TextField
+              label="Total (Pesos)"
+              type="number"
+              value={totalKilos === 0 ? '' : totalKilos}
+              onChange={(e) => setTotalKilos(Number(e.target.value) || 0)}
+            />
+          )}
+
           <TextField
-            label="Precio Unitario"
+            label={getPrecioUnitLabel()}
             type="number"
             value={precioUnit === 0 ? '' : precioUnit}
             onChange={(e) => setPrecioUnit(Number(e.target.value) || 0)}
+            // Podrías poner readOnly si quieres que el usuario no lo cambie manualmente:
+            // inputProps={{ readOnly: tipoCont === 'kilos' }}
           />
 
           <FormControl>
@@ -261,18 +318,19 @@ function DetalleModal({
               labelId="tipoCont-label"
               value={tipoCont}
               label="Tipo"
-              onChange={(e) => setTipoCont(e.target.value as 'unidad' | 'caja' | 'paquete')}
+              onChange={(e) => setTipoCont(e.target.value as TipoContenedor)}
               sx={{ width: 120 }}
             >
               <MenuItem value="unidad">Unidad</MenuItem>
               <MenuItem value="caja">Caja</MenuItem>
               <MenuItem value="paquete">Paquete</MenuItem>
+              <MenuItem value="kilos">Kilos</MenuItem>
             </Select>
           </FormControl>
 
           {(tipoCont === 'caja' || tipoCont === 'paquete') && (
             <TextField
-              label="Unid x Cont."
+              label={getUpcLabel()}
               type="number"
               value={upc === 0 ? '' : upc}
               onChange={(e) => setUpc(Number(e.target.value) || 0)}
@@ -435,7 +493,11 @@ export default function Compras() {
         sub = d.cantidad * upc * d.precioUnitario;
       } else if (d.tipoContenedor === 'caja') {
         sub = d.cantidad * d.precioUnitario;
+      } else if (d.tipoContenedor === 'kilos') {
+        // Igual que "unidad": sub = cantidad * precioUnitario
+        sub = d.cantidad * d.precioUnitario;
       } else {
+        // "unidad"
         sub = d.cantidad * d.precioUnitario;
       }
       return acc + sub;
@@ -518,9 +580,6 @@ export default function Compras() {
     setDetallesCompra([]);
     setViewCompraId(null);
   }
-
-  // QUITAMOS la opción de eliminar en la tabla principal (el ícono)
-  // => todo lo demás igual
 
   function handleDeleteCompra(compra: Purchase) {
     openConfirmDialog(
@@ -628,7 +687,6 @@ export default function Compras() {
                         >
                           <VisibilityIcon />
                         </IconButton>
-                        {/* Ícono de eliminar removido */}
                       </TableCell>
                     </TableRow>
                   );
@@ -730,7 +788,12 @@ export default function Compras() {
                   } else if (d.tipoContenedor === 'caja') {
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = upc > 0 ? d.precioUnitario / upc : 0;
+                  } else if (d.tipoContenedor === 'kilos') {
+                    // Se comporta como 'unidad'
+                    sub = d.cantidad * d.precioUnitario;
+                    precioPorPieza = d.precioUnitario;
                   } else {
+                    // 'unidad'
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = d.precioUnitario;
                   }
@@ -738,7 +801,9 @@ export default function Compras() {
                   const piezasTotales =
                     d.tipoContenedor === 'unidad'
                       ? d.cantidad
-                      : d.cantidad * upc;
+                      : d.tipoContenedor === 'kilos'
+                        ? d.cantidad
+                        : d.cantidad * upc;
 
                   return (
                     <TableRow key={idx}>
@@ -850,13 +915,18 @@ export default function Compras() {
                     sub = d.cantidad * upc * d.precioUnitario;
                   } else if (d.tipoContenedor === 'caja') {
                     sub = d.cantidad * d.precioUnitario;
+                  } else if (d.tipoContenedor === 'kilos') {
+                    sub = d.cantidad * d.precioUnitario;
                   } else {
+                    // 'unidad'
                     sub = d.cantidad * d.precioUnitario;
                   }
 
                   const piezas = d.tipoContenedor === 'unidad'
                     ? d.cantidad
-                    : d.cantidad * upc;
+                    : d.tipoContenedor === 'kilos'
+                      ? d.cantidad
+                      : d.cantidad * upc;
 
                   const precioPorPieza = (d as any).precioPorPieza
                     ? (d as any).precioPorPieza.toFixed(2)

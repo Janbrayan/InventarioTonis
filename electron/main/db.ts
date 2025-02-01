@@ -168,12 +168,7 @@ CREATE TABLE IF NOT EXISTS sales (
 // ==================================
 //   Tabla "detail_ventas" (detalle de ventas)
 // ==================================
-// NOTA: Aquí ya incluimos: 
-//       - precioLista (el precio normal sin descuento)
-//       - descuentoManualFijo (el descuento en pesos que aplica el vendedor)
-//       - precioUnitario (el precio final que pagó el cliente)
-//       - subtotal
-//       (El resto de campos son como antes.)
+// Incluye campos para precioLista, descuentoManualFijo, etc.
 db.exec(`
 CREATE TABLE IF NOT EXISTS detail_ventas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,20 +198,41 @@ CREATE TABLE IF NOT EXISTS detail_ventas (
 `);
 
 // ==================================
-//   Tabla "consumos_internos" (o "merma", "salidas_extra", etc.)
+//   Tabla "consumos_internos" (merma, salidas extra, etc.)
 // ==================================
 db.exec(`
 CREATE TABLE IF NOT EXISTS consumos_internos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   loteId INTEGER NOT NULL,
   cantidad REAL NOT NULL DEFAULT 0,
-  motivo TEXT,           -- p.ej. "muestras", "consumo interno", "daño", etc.
-  observaciones TEXT,    -- si gustas
+  motivo TEXT,        -- p.ej. "muestras", "consumo interno", "daño", etc.
+  observaciones TEXT, -- si gustas
   fecha TEXT NOT NULL,   -- momento en que se efectúa esta salida
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
 
   FOREIGN KEY (loteId) REFERENCES lotes(id)
+);
+`);
+
+// ==================================
+//   Tabla "cortes" (cierre de caja)
+// ==================================
+db.exec(`
+CREATE TABLE IF NOT EXISTS cortes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fechaCorte TEXT NOT NULL,               -- Momento exacto del corte
+  fechaInicio TEXT NOT NULL,              -- Rango de inicio (ej: "2025-02-10 00:00:00")
+  fechaFin TEXT NOT NULL,                 -- Rango de fin   (ej: "2025-02-10 23:59:59")
+  totalVentas REAL NOT NULL DEFAULT 0,    -- Suma de ventas en ese periodo
+  totalDescuentos REAL NOT NULL DEFAULT 0,-- Descuentos totales (si aplica)
+  netoVentas REAL NOT NULL DEFAULT 0,     -- Ventas netas = totalVentas - totalDescuentos
+  totalEgresos REAL NOT NULL DEFAULT 0,   -- Retiros/inversiones en efectivo (si aplica)
+  saldoFinal REAL NOT NULL DEFAULT 0,     -- Efectivo que queda tras egresos
+  usuarioId INTEGER,                      -- Usuario que realizó el corte (opcional)
+  observaciones TEXT,                     -- Notas adicionales
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
 );
 `);
 

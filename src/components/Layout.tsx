@@ -16,7 +16,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded';
-
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -286,8 +286,8 @@ export default function Layout() {
             {/* Sección Reportes */}
             <li>
               <Link to="/app/reportes" className="menu-link">
-                <AssessmentIcon className="menu-icon" />
-                Reportes
+                <AttachMoneyIcon className="menu-icon" />
+                Corte
               </Link>
             </li>
 
