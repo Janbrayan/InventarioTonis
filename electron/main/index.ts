@@ -1,4 +1,8 @@
 import { app, BrowserWindow, Menu } from 'electron';
+// ❌ En ESM, no se permite: import { autoUpdater } from 'electron-updater';
+import updater from 'electron-updater'; // <-- import default
+const { autoUpdater } = updater;       // <-- extraes la propiedad autoUpdater
+
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { setupIpcHandlers } from './ipcHandlers';
@@ -10,8 +14,8 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
-    backgroundColor: '#0d1117', // Color oscuro futurista
-    show: true,                // <-- Oculta la ventana inicialmente
+    backgroundColor: '#0d1117',
+    show: true,
     webPreferences: {
       contextIsolation: true,
       preload: join(__dirname, '../preload/preload.mjs'),
@@ -19,23 +23,29 @@ function createWindow() {
   });
 
   if (process.env.NODE_ENV === 'development') {
-    // Opcionalmente ocultar menú:
     Menu.setApplicationMenu(null);
     mainWindow.loadURL('http://localhost:5173');
   } else {
     mainWindow.loadFile(join(__dirname, '../../../dist/index.html'));
   }
 
-  // Espera a que el contenido esté listo para mostrar (reduce el flash):
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.show(); // <-- aquí mostramos la ventana cuando React termina de cargar
+    mainWindow.show();
+    autoUpdater.checkForUpdatesAndNotify();
   });
-
-  // O también podemos hacer:
-  // mainWindow.once('ready-to-show', () => {
-  //   mainWindow.show();
-  // });
 }
+
+// Manejo de eventos de autoUpdater
+autoUpdater.on('update-available', () => {
+  console.log('Nueva versión disponible. Descargando...');
+});
+autoUpdater.on('update-not-available', () => {
+  console.log('No hay actualizaciones disponibles.');
+});
+autoUpdater.on('update-downloaded', () => {
+  console.log('Actualización descargada. Se aplicará al reiniciar la app.');
+  // autoUpdater.quitAndInstall();
+});
 
 app.whenReady().then(() => {
   createWindow();

@@ -17,11 +17,14 @@
     "jsx": "react-jsx",
     "baseUrl": "./",
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
-    },
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["src", "electron"],
+  // Asegúrate de incluir tus carpetas y global.d.ts
+  "include": [
+    "src",
+    "electron",
+    "global.d.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

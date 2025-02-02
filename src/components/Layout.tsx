@@ -10,13 +10,13 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import CategoryIcon from '@mui/icons-material/Category';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -156,7 +156,8 @@ export default function Layout() {
     <div className="dashboard-container">
       {/* Barra lateral */}
       <aside className="sidebar">
-        <h2 className="sidebar-title">Admin Panel</h2>
+        {/* Aquí agregamos la versión 2.2.3 visible */}
+        <h2 className="sidebar-title">Admin Panel v2.2.3</h2>
 
         <nav>
           <ul className="menu-list">
