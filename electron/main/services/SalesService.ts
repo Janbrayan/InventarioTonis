@@ -29,8 +29,9 @@ export interface DetalleVenta {
   lote?: string;                 // Para enlazar con un Lote específico si gustas
   fechaCaducidad?: string;
 
-  tipoContenedor?: 'unidad' | 'caja' | 'paquete';
-  unidadesPorContenedor?: number; // Cuántas unidades lleva cada caja o paquete
+  // Puedes agregar 'kilos' si lo manejas también:
+  tipoContenedor?: 'unidad' | 'caja' | 'paquete' | 'kilos';
+  unidadesPorContenedor?: number; // Cuántas unidades lleva cada caja/paquete
   piezasVendidas?: number;        // total de piezas vendidas (se calcula)
 }
 
@@ -63,7 +64,6 @@ export class SalesService {
    */
   static async getEarliestLotExpiration(productId: number): Promise<string | null> {
     try {
-      // Hacemos un cast a LoteExpDateRow | undefined
       const row = db.prepare(`
         SELECT fechaCaducidad
         FROM lotes
@@ -75,7 +75,6 @@ export class SalesService {
         LIMIT 1
       `).get(productId) as LoteExpDateRow | undefined;
 
-      // Verificamos si hay fila y si la fechaCaducidad no es nula
       if (!row || !row.fechaCaducidad) {
         return null;
       }
@@ -145,10 +144,9 @@ export class SalesService {
    *  =========================================================
    *  - precioLista se toma de `products.precioVenta`
    *  - descuentoManualFijo viene en `sale.detalles[x].descuentoManualFijo` (0 si no hay)
-   *  - precioUnitario = precioLista - descuentoManualFijo
+   *  - precioUnitario = precioLista - descMan
    */
   static async createSale(sale: Sale): Promise<{ success: boolean; message?: string }> {
-    // Hora local de México
     const now = getHoraLocalCDMX();
 
     // ========= (A) Verificación previa de stock =========
@@ -172,7 +170,6 @@ export class SalesService {
 
         const stockDisponible = stockRow?.totalStock ?? 0;
 
-        // Si NO alcanza el stock, lanzamos un error para interrumpir la transacción
         if (piezasRequeridas > stockDisponible) {
           throw new Error(
             `No hay stock suficiente para producto #${det.productoId}. ` +
@@ -182,7 +179,7 @@ export class SalesService {
       }
     }
 
-    // ========== (B) Transacción para insertar venta y descontar lotes ==========
+    // ========== (B) Transacción para insertar venta y descontar lotes ========== 
     const tx = db.transaction(() => {
       // 1) Insertar encabezado en 'sales'
       const fechaVenta = sale.fecha ?? now;
@@ -270,9 +267,7 @@ export class SalesService {
 
           let toDiscount = piezas;
 
-          // FEFO: ordenamos por fechaCaducidad ASC, luego id ASC
           while (toDiscount > 0) {
-            // Cast a DBLoteRow para que TS entienda fechaCaducidad, cantidadActual, etc.
             const loteRow = db.prepare(`
               SELECT
                 id,
@@ -336,7 +331,6 @@ export class SalesService {
         WHERE ventaId = ?
       `).all(ventaId);
 
-      // Mapeamos el resultado para encajar con la interfaz DetalleVenta
       return rows.map((r: any) => ({
         id: r.id,
         ventaId: r.ventaId,
@@ -360,6 +354,32 @@ export class SalesService {
     } catch (error) {
       console.error('Error getDetallesByVentaId:', error);
       return [];
+    }
+  }
+
+  /** =========================================================
+   *  6) (NUEVO) OBTENER TIPO DE CONTENEDOR DE LA ÚLTIMA COMPRA
+   *  =========================================================
+   *  - Retorna el tipoContenedor de la compra más reciente (según createdAt DESC)
+   *    para el productId dado, o null si no existe ningún registro.
+   *  - Si manejas 'kilos', agrégalo al tipo de retorno y a tu BD.
+   */
+  static async getLastPurchaseContainer(
+    productId: number
+  ): Promise<'unidad' | 'caja' | 'paquete' | 'kilos' | null> {
+    try {
+      const row = db.prepare(`
+        SELECT tipoContenedor
+        FROM detail_compras
+        WHERE productoId = ?
+        ORDER BY createdAt DESC
+        LIMIT 1
+      `).get(productId) as { tipoContenedor: 'unidad' | 'caja' | 'paquete' | 'kilos' } | undefined;
+
+      return row?.tipoContenedor ?? null;
+    } catch (error) {
+      console.error('Error getLastPurchaseContainer:', error);
+      return null;
     }
   }
 }

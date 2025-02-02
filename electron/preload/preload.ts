@@ -102,14 +102,13 @@ export interface FrontDetalleVenta {
   lote?: string;
   fechaCaducidad?: string;
 
-  tipoContenedor?: 'unidad' | 'caja' | 'paquete';
+  tipoContenedor?: 'unidad' | 'caja' | 'paquete' | 'kilos';
   unidadesPorContenedor?: number;
   piezasVendidas?: number;
 }
 
 /**
  * Interfaz para crear y leer cortes (cierre de caja) desde el frontend.
- * Opcional, si quieres tipar los parámetros.
  */
 export interface FrontCorte {
   id?: number;
@@ -218,7 +217,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('historial-getDetallesByVentaId', ventaId),
   historialGetVentasByRange: (range: 'day' | 'week' | 'month' | 'all') =>
     ipcRenderer.invoke('historial-getVentasByRange', range),
-
   // (NUEVO) Obtener productos sin ventas en un rango
   historialGetProductosNoVendidos: (fechaInicio: string, fechaFin: string) =>
     ipcRenderer.invoke('historial-getProductosNoVendidos', fechaInicio, fechaFin),
@@ -256,9 +254,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ventasStatsGetGananciaBruta: (fechaInicio?: string, fechaFin?: string) =>
     ipcRenderer.invoke('ventasStats-getGananciaBruta', fechaInicio, fechaFin),
 
-  // ========== (NUEVO) Función para fecha de caducidad ==========
+  // ========== (NUEVO) Fecha de caducidad más próxima (FEFO) ==========
   getEarliestLotExpiration: (productId: number) =>
     ipcRenderer.invoke('get-earliest-lot-expiration', productId),
+
+  // ========== (NUEVO) Saber el tipoContenedor de la última compra ==========
+  getLastPurchaseContainer: (productId: number) =>
+    ipcRenderer.invoke('get-last-purchase-container', productId),
 
   // ========== (NUEVO) CORTES (crear, obtener, generar PDF) ==========
   createCorte: (

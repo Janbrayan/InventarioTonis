@@ -18,7 +18,7 @@ import { VentasEstadisticasService } from './services/VentasEstadisticasService'
 import { createCorte, getCorteById, generateCortePDF } from './services/CortesService';
 
 export function setupIpcHandlers() {
-  // ========== LOGIN ==========
+  // ========== LOGIN ========== 
   ipcMain.handle('login-user', async (_event, { username, password }) => {
     try {
       const result = await UserService.loginUser(username, password);
@@ -350,6 +350,16 @@ export function setupIpcHandlers() {
     }
   });
 
+  // (NUEVO) ======== get-last-purchase-container ========
+  ipcMain.handle('get-last-purchase-container', async (_event, productId: number) => {
+    try {
+      return await SalesService.getLastPurchaseContainer(productId);
+    } catch (error) {
+      console.error('Error get-last-purchase-container:', error);
+      return null;
+    }
+  });
+
   // ========== STATS ==========
   ipcMain.handle(
     'stats-getTotalComprasPorFecha',
@@ -490,9 +500,7 @@ export function setupIpcHandlers() {
     }
   });
 
-  // (ELIMINADO el handle para getDetallesByVentaIdIncludingZero)
-
-  // (NUEVO) Manejo para obtener productos sin ventas en [fechaInicio, fechaFin]
+  // (NUEVO) Obtener productos sin ventas en [fechaInicio, fechaFin]
   ipcMain.handle('historial-getProductosNoVendidos', async (_event, fechaInicio: string, fechaFin: string) => {
     try {
       return await HistorialVentasService.getProductosNoVendidos(fechaInicio, fechaFin);
@@ -593,7 +601,7 @@ export function setupIpcHandlers() {
     }
   );
 
-  // ========== VENTAS ESTADÍSTICAS (NUEVO) ==========
+  // ========== VENTAS ESTADÍSTICAS ==========
   ipcMain.handle(
     'ventasStats-getTotalVentas',
     async (_event, fechaInicio?: string, fechaFin?: string) => {
@@ -698,54 +706,52 @@ export function setupIpcHandlers() {
     }
   );
 
-// ========== (NUEVO) CORTES ==========
-
-ipcMain.handle('create-corte', async (_event, { fechaInicio, fechaFin, usuarioId, montoEgresos, observaciones }) => {
-  try {
-    const newCorte = createCorte(fechaInicio, fechaFin, usuarioId, montoEgresos, observaciones);
-    return { success: true, data: newCorte };
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error create-corte IPC:', error);
-      return { success: false, error: error.message };
-    } else {
-      console.error('Error create-corte IPC:', error);
-      return { success: false, error: 'Unknown error.' };
+  // ========== (NUEVO) CORTES ==========
+  ipcMain.handle('create-corte', async (_event, { fechaInicio, fechaFin, usuarioId, montoEgresos, observaciones }) => {
+    try {
+      const newCorte = createCorte(fechaInicio, fechaFin, usuarioId, montoEgresos, observaciones);
+      return { success: true, data: newCorte };
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error create-corte IPC:', error);
+        return { success: false, error: error.message };
+      } else {
+        console.error('Error create-corte IPC:', error);
+        return { success: false, error: 'Unknown error.' };
+      }
     }
-  }
-});
+  });
 
-ipcMain.handle('get-corte-by-id', async (_event, corteId: number) => {
-  try {
-    const corte = getCorteById(corteId);
-    return { success: true, data: corte };
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error get-corte-by-id IPC:', error);
-      return { success: false, error: error.message };
-    } else {
-      console.error('Error get-corte-by-id IPC:', error);
-      return { success: false, error: 'Unknown error.' };
+  ipcMain.handle('get-corte-by-id', async (_event, corteId: number) => {
+    try {
+      const corte = getCorteById(corteId);
+      return { success: true, data: corte };
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error get-corte-by-id IPC:', error);
+        return { success: false, error: error.message };
+      } else {
+        console.error('Error get-corte-by-id IPC:', error);
+        return { success: false, error: 'Unknown error.' };
+      }
     }
-  }
-});
+  });
 
-ipcMain.handle('generate-corte-pdf', async (_event, { corteData, outputPath }) => {
-  try {
-    // En vez de ignorar el valor de return, guardamos la ruta real en 'finalPath'
-    const finalPath = await generateCortePDF(corteData, outputPath);
+  ipcMain.handle('generate-corte-pdf', async (_event, { corteData, outputPath }) => {
+    try {
+      // En vez de ignorar el valor de return, guardamos la ruta real en 'finalPath'
+      const finalPath = await generateCortePDF(corteData, outputPath);
 
-    // Retornamos esa ruta para que el frontend la muestre correctamente
-    return { success: true, file: finalPath };
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error generate-corte-pdf IPC:', error);
-      return { success: false, error: error.message };
-    } else {
-      console.error('Error generate-corte-pdf IPC:', error);
-      return { success: false, error: 'Unknown error.' };
+      // Retornamos esa ruta para que el frontend la muestre correctamente
+      return { success: true, file: finalPath };
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error generate-corte-pdf IPC:', error);
+        return { success: false, error: error.message };
+      } else {
+        console.error('Error generate-corte-pdf IPC:', error);
+        return { success: false, error: 'Unknown error.' };
+      }
     }
-  }
-});
-
+  });
 }

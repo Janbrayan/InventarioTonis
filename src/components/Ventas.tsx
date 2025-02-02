@@ -33,35 +33,38 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-/** Interfaz de Producto con stock */
 interface Product {
   id: number;
   nombre: string;
-  precioVenta?: number;  // Usado para inicializar precioLista
+  precioVenta?: number;
   stock?: number;
 }
 
-/** Estructura básica de una Venta */
 interface Sale {
   id?: number;
   total?: number;
   updatedAt?: string;
 }
 
-/** 
- * DetalleVenta (frontend):
- * - cantidad / descuentoManualFijo => numéricos
- * - cantidadStr / descuentoStr => strings con lo que el usuario teclea
- * - precioLista y precioUnitario => Solo lectura en la UI
- */
+/** Modo de venta */
+type ModoVenta = 'kilos' | 'pesos' | 'pieza';
+
+/** DetalleVenta */
 interface DetalleVenta {
   productoId: number;
+  modoVenta: ModoVenta;
+
   cantidad: number;
   cantidadStr: string;
   descuentoManualFijo: number;
   descuentoStr: string;
 
-  // Campos solo lectura en la UI
+  montoPesos?: number;
+  pesoAproxPieza?: number;
+
+  /** Guardamos el containerType si lo detectamos como 'kilos' */
+  containerType?: 'kilos' | 'unidad' | 'caja' | 'paquete' | null;
+
   precioLista: number;
   precioUnitario: number;
   subtotal: number;
@@ -74,7 +77,7 @@ interface ConfirmDialogProps {
   message: string;
   onClose: () => void;
   onConfirm: () => void;
-  onCancelAction?: () => void;  // Acción opcional al “Cancelar”
+  onCancelAction?: () => void;
 }
 
 function ConfirmDialog({
@@ -85,7 +88,6 @@ function ConfirmDialog({
   onConfirm,
   onCancelAction
 }: ConfirmDialogProps) {
-  // Si el usuario da “Cancelar”
   function handleCancel() {
     if (onCancelAction) {
       onCancelAction();
@@ -120,7 +122,6 @@ function ConfirmDialog({
   );
 }
 
-/** Props del Diálogo de Alerta (un solo botón “Cerrar”) */
 interface AlertDialogProps {
   open: boolean;
   message: string;
@@ -153,20 +154,17 @@ function AlertDialog({ open, message, onClose }: AlertDialogProps) {
   );
 }
 
-/** Para colorear el Chip según la cantidad de stock */
 function getStockColor(stock: number): 'error' | 'warning' | 'success' {
-  if (stock <= 0) return 'error';    // rojo
-  if (stock < 5) return 'warning';   // amarillo
-  return 'success';                  // verde
+  if (stock <= 0) return 'error';
+  if (stock < 5) return 'warning';
+  return 'success';
 }
 
-/** Convierte un número a letras en español (versión resumida) */
 function numberToSpanish(num: number): string {
   if (num === 0) return 'cero';
   return String(num);
 }
 
-/** Calcula la diferencia de días a la caducidad */
 function daysUntilExpiration(expDateStr: string): number {
   const expDate = new Date(expDateStr + 'T23:59:59');
   const now = new Date();
@@ -182,52 +180,38 @@ export default function Ventas() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal para crear una venta
   const [openModal, setOpenModal] = useState(false);
-
-  // Detalles de la venta en curso
   const [detalles, setDetalles] = useState<DetalleVenta[]>([]);
 
-  // Confirm Dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [cancelAction, setCancelAction] = useState<() => void>();
 
-  // Alert Dialog
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  // Modal ver detalles
   const [openDetalles, setOpenDetalles] = useState(false);
   const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
   const [viewVentaId, setViewVentaId] = useState<number | null>(null);
 
-  // Selección manual de producto
   const [selProductoId, setSelProductoId] = useState<number>(0);
 
-  // Pago/cambio
   const [pagoStr, setPagoStr] = useState('');
   const [cambio, setCambio] = useState(0);
 
-  /** 
-   * (NUEVO) Almacenar qué productos ya han mostrado alerta de caducidad
-   * dentro de esta venta, para no repetir la pregunta.
-   */
   const [warnedProducts, setWarnedProducts] = useState<Set<number>>(() => new Set());
 
-  /** ============== Alert helpers ============== */
-  function openAlert(message: string) {
-    setAlertMessage(message);
+  function openAlert(msg: string) {
+    setAlertMessage(msg);
     setAlertOpen(true);
   }
   function closeAlert() {
-    setAlertOpen(false);
     setAlertMessage('');
+    setAlertOpen(false);
   }
 
-  /** ============== Cargar datos (ventas + productos) ============== */
   useEffect(() => {
     fetchAll();
   }, []);
@@ -235,21 +219,20 @@ export default function Ventas() {
   async function fetchAll() {
     try {
       setLoading(true);
-      const [ventasList, prodList] = await Promise.all([
+      const [listVentas, listProd] = await Promise.all([
         window.electronAPI.getSalesToday(),
         window.electronAPI.getProducts()
       ]);
-      setVentas(ventasList || []);
-      setProducts(prodList || []);
-    } catch (err) {
-      console.error('Error fetchAll Ventas:', err);
+      setVentas(listVentas || []);
+      setProducts(listProd || []);
+    } catch (error) {
+      console.error('Error fetchAll:', error);
       openAlert('Error al cargar datos de ventas/productos.');
     } finally {
       setLoading(false);
     }
   }
 
-  // Efecto A: si pendingProductId viene en location, abrimos modal
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -265,7 +248,6 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate]);
 
-  // Efecto B: si openModal==='createSale' y hay un productId => agregamos producto
   useEffect(() => {
     if (!loading) {
       const st: any = location.state;
@@ -281,14 +263,11 @@ export default function Ventas() {
     }
   }, [loading, location.state, navigate, openModal]);
 
-  /** ============== Abrir/cerrar modal de crear venta ============== */
   function handleOpenCreate() {
     setDetalles([]);
     setPagoStr('');
     setCambio(0);
     setOpenModal(true);
-
-    // Reset warnedProducts
     setWarnedProducts(new Set());
   }
   function handleCloseModal() {
@@ -296,17 +275,14 @@ export default function Ventas() {
     setDetalles([]);
     setPagoStr('');
     setCambio(0);
-
-    // Reset warnedProducts (para la siguiente venta)
     setWarnedProducts(new Set());
   }
 
-  /** checkCloseToExpiration => true si caduca en <=7 días */
   async function checkCloseToExpiration(productId: number): Promise<boolean> {
     try {
       const expDateStr = await window.electronAPI.getEarliestLotExpiration(productId);
       if (!expDateStr) return false;
-      const diffDays = new Date(expDateStr) ? daysUntilExpiration(expDateStr) : 999999;
+      const diffDays = daysUntilExpiration(expDateStr);
       return diffDays <= 7;
     } catch (error) {
       console.error('Error checkCloseToExpiration:', error);
@@ -314,68 +290,58 @@ export default function Ventas() {
     }
   }
 
-  /** Seleccionar producto manualmente */
   async function handleChangeProducto(e: SelectChangeEvent<number>) {
-    const newProdId = Number(e.target.value);
+    const newProdId = +e.target.value;
     if (!newProdId) {
       setSelProductoId(0);
       return;
     }
 
-    // Verificar stock
+    const containerType = await window.electronAPI.getLastPurchaseContainer(newProdId);
+    console.log('containerType:', containerType);
+
     const foundProd = products.find((p) => p.id === newProdId);
     if (foundProd && (foundProd.stock ?? 0) <= 0) {
       openAlert('Debes agregar stock a este producto antes de venderlo.');
       return;
     }
 
-    // Revisar caducidad
     const isNear = await checkCloseToExpiration(newProdId);
     if (isNear) {
-      // (A) Si no se había mostrado la alerta en esta venta
       if (!warnedProducts.has(newProdId)) {
         const newSet = new Set(warnedProducts);
-
-        // Obtenemos info para mostrar en la alerta: nombre, stock
         const prodName = foundProd?.nombre || `(ID=${newProdId})`;
         const stockVal = foundProd?.stock || 0;
-        // Y cuántos están advertidos
         const totalWarn = newSet.size + 1;
 
-        // Mensaje con nombre y stock
         const msg = `El producto "${prodName}" (stock: ${stockVal}) está próximo a caducar.\nActualmente tienes ${totalWarn} producto(s) a punto de caducar.\n¿Deseas aplicar un descuento (5)?`;
 
         openConfirmDialog(
           'Producto próximo a caducar',
           msg,
-          // OnConfirm => desc=5, lo marcamos en set
           () => {
-            addProductById(newProdId, 5);
+            addProductById(newProdId, 5, containerType);
             newSet.add(newProdId);
             setWarnedProducts(newSet);
             closeConfirmDialog();
           },
-          // OnCancel => desc=0, también marcamos en set => no vuelve a preguntar
           () => {
-            addProductById(newProdId, 0);
+            addProductById(newProdId, 0, containerType);
             newSet.add(newProdId);
             setWarnedProducts(newSet);
           }
         );
       } else {
-        // (B) Ya se había advertido => no volver a preguntar
-        addProductById(newProdId, 5);
+        addProductById(newProdId, 5, containerType);
       }
     } else {
-      // No está cercano => desc=0
-      addProductById(newProdId, 0);
+      addProductById(newProdId, 0, containerType);
     }
 
     setSelProductoId(0);
   }
 
-  /** Agregar producto */
-  function addProductById(productId: number, descuentoFijo = 0) {
+  function addProductById(productId: number, descuentoFijo = 0, containerType?: string | null) {
     const index = detalles.findIndex((r) => r.productoId === productId);
     const prod = products.find((p) => p.id === productId);
     if (!prod) return;
@@ -383,8 +349,12 @@ export default function Ventas() {
     const precioLista = prod.precioVenta ?? 0;
     const precioFinal = precioLista - descuentoFijo;
 
+    let defaultModo: ModoVenta = 'pieza';
+    if (containerType === 'kilos') {
+      defaultModo = 'kilos';
+    }
+
     if (index >= 0) {
-      // Ya existe => incrementar cantidad
       const copy = [...detalles];
       const row = copy[index];
       row.cantidad += 1;
@@ -394,11 +364,14 @@ export default function Ventas() {
       row.precioLista = precioLista;
       row.precioUnitario = precioFinal;
       row.subtotal = row.cantidad * row.precioUnitario;
+      row.containerType = (containerType as any) || 'unidad';
+      row.modoVenta = defaultModo;
       setDetalles(copy);
     } else {
-      // Nuevo
       const nuevo: DetalleVenta = {
         productoId:productId,
+        containerType: (containerType as any) || 'unidad',
+        modoVenta: defaultModo,
         cantidad: 1,
         cantidadStr: '1',
         descuentoManualFijo: descuentoFijo,
@@ -411,60 +384,123 @@ export default function Ventas() {
     }
   }
 
-  /** Eliminar renglón */
   function removeRenglonDetalle(idx: number) {
     const copy = [...detalles];
     copy.splice(idx, 1);
     setDetalles(copy);
   }
 
-  /** Manejar cambio de cantidad */
+  function handleChangeModoVenta(e: SelectChangeEvent, idx: number) {
+    const newModo = e.target.value as ModoVenta;
+    const copy = [...detalles];
+    copy[idx].modoVenta = newModo;
+
+    if (newModo === 'pesos') {
+      copy[idx].montoPesos = 0;
+      copy[idx].cantidad = 0;
+      copy[idx].cantidadStr = '0';
+    } else if (newModo === 'pieza') {
+      copy[idx].pesoAproxPieza = 0.05;
+      copy[idx].cantidad = 1;
+      copy[idx].cantidadStr = '1';
+    } else {
+      copy[idx].cantidad = 1;
+      copy[idx].cantidadStr = '1';
+    }
+
+    setDetalles(copy);
+    recalcRow(idx);
+  }
+
+  // Cambiamos la firma para aceptar HTMLInputElement | HTMLTextAreaElement
+  function handleChangeMontoPesos(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    idx: number
+  ) {
+    const valueNum = parseFloat(e.target.value) || 0;
+    const copy = [...detalles];
+    copy[idx].montoPesos = valueNum;
+    setDetalles(copy);
+    recalcRow(idx);
+  }
+
+  function handleChangePesoPieza(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    idx: number
+  ) {
+    const val = parseFloat(e.target.value) || 0;
+    const copy = [...detalles];
+    copy[idx].pesoAproxPieza = val;
+    setDetalles(copy);
+    recalcRow(idx);
+  }
+
   function handleChangeCantidad(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
   ) {
     const inputValue = e.target.value;
     const copy = [...detalles];
-    const row = copy[idx];
-    row.cantidadStr = inputValue;
+    copy[idx].cantidadStr = inputValue;
 
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
-      row.cantidad = parsed;
-      row.subtotal = row.cantidad * row.precioUnitario;
+      copy[idx].cantidad = parsed;
     }
     setDetalles(copy);
+    recalcRow(idx);
   }
 
-  /** Manejar cambio de descuento */
   function handleChangeDescuento(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     idx: number
   ) {
     const inputValue = e.target.value;
     const copy = [...detalles];
-    const row = copy[idx];
-    row.descuentoStr = inputValue;
+    copy[idx].descuentoStr = inputValue;
 
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
-      row.descuentoManualFijo = parsed;
-      const prod = products.find((p) => p.id === row.productoId);
-      const precioLista = prod?.precioVenta ?? 0;
-      row.precioLista = precioLista;
-      row.precioUnitario = precioLista - parsed;
+      copy[idx].descuentoManualFijo = parsed;
+    }
+    setDetalles(copy);
+    recalcRow(idx);
+  }
+
+  function recalcRow(idx: number) {
+    const copy = [...detalles];
+    const row = copy[idx];
+    const prod = products.find((p) => p.id === row.productoId);
+    const precioLista = prod?.precioVenta ?? 0;
+
+    const desc = row.descuentoManualFijo || 0;
+    row.precioLista = precioLista;
+    row.precioUnitario = precioLista - desc;
+
+    if (row.modoVenta === 'pesos') {
+      const mp = row.montoPesos || 0;
+      if (row.precioUnitario > 0) {
+        row.cantidad = mp / row.precioUnitario;
+      } else {
+        row.cantidad = 0;
+      }
+      row.cantidadStr = row.cantidad.toFixed(2);
+      row.subtotal = mp;
+    } else if (row.modoVenta === 'pieza') {
+      row.subtotal = row.cantidad * row.precioUnitario;
+    } else {
+      // kilos
       row.subtotal = row.cantidad * row.precioUnitario;
     }
+
     setDetalles(copy);
   }
 
-  /** Calcular total */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => acc + d.subtotal, 0);
   }
 
-  /** Manejar cambio de pago */
-  function handlePagoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePagoChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const pagoNum = parseFloat(e.target.value) || 0;
     setPagoStr(e.target.value);
     const total = calcularTotal();
@@ -472,7 +508,6 @@ export default function Ventas() {
     setCambio(c > 0 ? c : 0);
   }
 
-  /** Guardar venta */
   async function handleSaveVenta() {
     if (detalles.length === 0) {
       openAlert('No puedes crear una venta sin productos.');
@@ -482,7 +517,7 @@ export default function Ventas() {
     const total = calcularTotal();
     const lineas = detalles.map((d, i) => {
       const pn = products.find((pp) => pp.id === d.productoId)?.nombre || `ID=${d.productoId}`;
-      return `${i + 1}. ${pn} (x${d.cantidad}, desc=$${d.descuentoManualFijo}) = $${d.subtotal.toFixed(2)}`;
+      return `${i + 1}. ${pn} (${d.modoVenta}, desc=$${d.descuentoManualFijo}) = $${d.subtotal.toFixed(2)}`;
     }).join('\n');
 
     const pagoNum = parseFloat(pagoStr) || 0;
@@ -501,10 +536,10 @@ ${lineas}
 
 Total: $${total.toFixed(2)}
 Pago: $${pagoNum.toFixed(2)}
-Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''}
+Cambio: $${cambioNum.toFixed(2)} ${cambioEnLetra ? '(' + cambioEnLetra + ')' : ''}
 
 ¿Deseas REALIZAR esta venta?
-    `;
+`;
 
     const action = async () => {
       try {
@@ -538,7 +573,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
     setOpenModal(false);
   }
 
-  /** ========== Confirm Dialog Helpers ========== */
   function openConfirmDialog(
     title: string,
     message: string,
@@ -557,7 +591,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
     setCancelAction(undefined);
   }
 
-  /** Ver detalles de venta */
   async function handleVerDetalles(ventaId: number) {
     try {
       setViewVentaId(ventaId);
@@ -569,13 +602,13 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
       openAlert('Error al obtener detalles de la venta.');
     }
   }
+
   function handleCloseDetalles() {
     setOpenDetalles(false);
     setDetallesVenta([]);
     setViewVentaId(null);
   }
 
-  /** Eliminar venta */
   function handleDeleteVenta(v: Sale) {
     openConfirmDialog(
       'Eliminar Venta',
@@ -603,11 +636,8 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
 
   const total = calcularTotal();
   const pagoNum = parseFloat(pagoStr) || 0;
-  const cambioNum = pagoNum > total ? (pagoNum - total) : 0;
+  const cambioNum = pagoNum > total ? pagoNum - total : 0;
   const cambioInt = Math.round(cambioNum);
-  const cambioEnLetra = cambioInt > 0
-    ? numberToSpanish(cambioInt) + (cambioInt === 1 ? ' peso' : ' pesos')
-    : '';
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -686,7 +716,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         </CardContent>
       </Card>
 
-      {/* ================== Modal Crear Venta ================== */}
+      {/* ========== Modal Crear Venta ========== */}
       <Dialog
         open={openModal}
         onClose={handleCloseModal}
@@ -737,14 +767,15 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
             </Select>
           </FormControl>
 
-          {/* Tabla interna de renglones (carrito) */}
+          {/* Tabla interna de renglones */}
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Producto</TableCell>
-                  <TableCell>Cantidad</TableCell>
-                  <TableCell>Descuento</TableCell>
+                  <TableCell>Modo</TableCell>
+                  <TableCell>Cantidad / Monto</TableCell>
+                  <TableCell>Desc</TableCell>
                   <TableCell>Precio Lista</TableCell>
                   <TableCell>Precio Unit</TableCell>
                   <TableCell>Subtotal</TableCell>
@@ -755,51 +786,120 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                 {detalles.map((d, idx) => {
                   const prod = products.find((pp) => pp.id === d.productoId);
                   const nombreProd = prod ? prod.nombre : `ID=${d.productoId}`;
+
                   return (
                     <TableRow key={idx}>
                       <TableCell>{nombreProd}</TableCell>
+
+                      {/* Modo: solo si containerType==='kilos' => <Select>, sino => "Unidad" */}
                       <TableCell>
-                        <TextField
-                          type="text"
-                          value={d.cantidadStr}
-                          onChange={(e) => handleChangeCantidad(e, idx)}
-                          sx={{ width: 60 }}
-                        />
+                        {d.containerType === 'kilos' ? (
+                          <FormControl size="small" sx={{ minWidth: 80 }}>
+                            <InputLabel>Modo</InputLabel>
+                            <Select
+                              value={d.modoVenta}
+                              onChange={(e) => handleChangeModoVenta(e, idx)}
+                            >
+                              <MenuItem value="kilos">Kilos</MenuItem>
+                              <MenuItem value="pesos">Pesos</MenuItem>
+                              <MenuItem value="pieza">Pieza</MenuItem>
+                            </Select>
+                          </FormControl>
+                        ) : (
+                          <Typography>Unidad</Typography>
+                        )}
                       </TableCell>
-                      {/* Descuento editable */}
+
+                      <TableCell>
+                        {d.containerType === 'kilos' ? (
+                          // Si es kilos => depende del modoVenta
+                          d.modoVenta === 'pesos' ? (
+                            <TextField
+                              label="Monto Pesos"
+                              type="number"
+                              size="small"
+                              value={d.montoPesos ?? ''}
+                              onChange={(e) => handleChangeMontoPesos(e, idx)}
+                              sx={{ width: 90 }}
+                            />
+                          ) : d.modoVenta === 'pieza' ? (
+                            <Box display="flex" gap={1}>
+                              <TextField
+                                label="# Piezas"
+                                size="small"
+                                type="text"
+                                value={d.cantidadStr}
+                                onChange={(e) => handleChangeCantidad(e, idx)}
+                                sx={{ width: 70 }}
+                              />
+                              <TextField
+                                label="Peso x Pieza"
+                                size="small"
+                                type="number"
+                                value={d.pesoAproxPieza ?? ''}
+                                onChange={(e) => handleChangePesoPieza(e, idx)}
+                                sx={{ width: 90 }}
+                              />
+                            </Box>
+                          ) : (
+                            /* modoVenta=kilos */
+                            <TextField
+                              label="Kilos"
+                              size="small"
+                              type="text"
+                              value={d.cantidadStr}
+                              onChange={(e) => handleChangeCantidad(e, idx)}
+                              sx={{ width: 70 }}
+                            />
+                          )
+                        ) : (
+                          // containerType !== 'kilos' => solo se vende por unidad
+                          <TextField
+                            label="# Unidades"
+                            size="small"
+                            type="text"
+                            value={d.cantidadStr}
+                            onChange={(e) => handleChangeCantidad(e, idx)}
+                            sx={{ width: 80 }}
+                          />
+                        )}
+                      </TableCell>
+
                       <TableCell>
                         <TextField
+                          label="Desc"
+                          size="small"
                           type="text"
                           value={d.descuentoStr}
                           onChange={(e) => handleChangeDescuento(e, idx)}
                           sx={{ width: 60 }}
                         />
                       </TableCell>
-                      {/* PrecioLista (readonly) */}
                       <TableCell>
                         <TextField
                           type="text"
+                          size="small"
                           value={d.precioLista.toFixed(2)}
                           InputProps={{ readOnly: true }}
-                          sx={{ width: 80 }}
+                          sx={{ width: 70 }}
                         />
                       </TableCell>
-                      {/* PrecioUnitario (readonly) */}
                       <TableCell>
                         <TextField
                           type="text"
+                          size="small"
                           value={d.precioUnitario.toFixed(2)}
                           InputProps={{ readOnly: true }}
-                          sx={{ width: 80 }}
+                          sx={{ width: 70 }}
                         />
                       </TableCell>
-                      {/* Subtotal (readonly) */}
                       <TableCell>
                         <TextField
                           type="text"
+                          size="small"
                           value={d.subtotal.toFixed(2)}
                           InputProps={{ readOnly: true }}
-                          sx={{ width: 80 }}
+                          sx={{ width: 70 }}
                         />
                       </TableCell>
                       <TableCell>
@@ -817,7 +917,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                 })}
                 {detalles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={8} align="center">
                       (Sin productos)
                     </TableCell>
                   </TableRow>
@@ -835,7 +935,7 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
               label="Pago del cliente"
               type="number"
               value={pagoStr}
-              onChange={handlePagoChange}
+              onChange={(e) => handlePagoChange(e)}
               sx={{ width: 120 }}
             />
             {cambio > 0 && (
@@ -844,7 +944,8 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
                   Cambio: ${cambio.toFixed(2)}
                 </Typography>
                 <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
-                  ({cambioInt > 0 ? numberToSpanish(cambioInt) : ''} {cambioInt === 1 ? 'peso' : 'pesos'})
+                  ({cambioInt > 0 ? numberToSpanish(cambioInt) : ''}{' '}
+                  {cambioInt === 1 ? 'peso' : 'pesos'})
                 </Typography>
               </Box>
             )}
@@ -858,7 +959,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         </DialogActions>
       </Dialog>
 
-      {/* ============== Modal Ver Detalles de Venta ============== */}
       <Dialog
         open={openDetalles}
         onClose={handleCloseDetalles}
@@ -919,7 +1019,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         </DialogActions>
       </Dialog>
 
-      {/* ============== Confirm Dialog ============== */}
       <ConfirmDialog
         open={confirmOpen}
         title={confirmTitle}
@@ -929,7 +1028,6 @@ Cambio: $${cambioNum.toFixed(2)} ${(cambioEnLetra && `(${cambioEnLetra})`) || ''
         onCancelAction={cancelAction}
       />
 
-      {/* ============== Alert Dialog ============== */}
       <AlertDialog
         open={alertOpen}
         message={alertMessage}

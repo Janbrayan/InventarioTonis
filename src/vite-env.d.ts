@@ -184,8 +184,6 @@ declare global {
         range: 'day' | 'week' | 'month' | 'all'
       ) => Promise<any>;
 
-      // (ELIMINADO): historialGetDetallesByVentaIdIncludingZero
-
       // (NUEVO) Obtener productos SIN ventas en [fechaInicio, fechaFin]
       historialGetProductosNoVendidos: (
         fechaInicio: string,
@@ -193,7 +191,6 @@ declare global {
       ) => Promise<any>;
 
       // ========== DASHBOARD ==========
-
       /** Obtiene métricas principales (totalProductos, totalProveedores, etc.) */
       dashboardGetMetrics: () => Promise<{
         totalProductos: number;
@@ -342,6 +339,11 @@ declare global {
       // (NUEVO) Para obtener la caducidad más próxima de un producto
       getEarliestLotExpiration: (productId: number) => Promise<string | null>;
 
+      // (NUEVO) Saber el tipoContenedor de la última compra
+      getLastPurchaseContainer: (
+        productId: number
+      ) => Promise<'unidad' | 'caja' | 'paquete' | 'kilos' | null>;
+
       // ========== (NUEVO) CORTES (crear, obtener, generar PDF) ==========
       createCorte: (
         fechaInicio: string,
@@ -365,6 +367,6 @@ declare global {
         corteData: any,
         outputPath: string
       ) => Promise<{ success: boolean; file?: string; error?: string }>;
-    }
+    };
   }
 }
