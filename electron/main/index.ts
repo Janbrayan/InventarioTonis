@@ -26,7 +26,7 @@ function createWindow() {
     Menu.setApplicationMenu(null);
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    mainWindow.loadFile(join(__dirname, '../../../dist/index.html'));
+    mainWindow.loadFile(join(__dirname, '../../dist/index.html'));
   }
 
   mainWindow.webContents.on('did-finish-load', () => {

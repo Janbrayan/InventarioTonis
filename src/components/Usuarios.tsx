@@ -105,8 +105,11 @@ export default function Usuarios() {
 
   // Campos del form
   const [username, setUsername] = useState('');
-  const [role, setRole] = useState('trabajador'); // por defecto "trabajador"
+  const [role, setRole] = useState('trabajador');
   const [activo, setActivo] = useState(true);
+
+  /** ★ NUEVO: campo de contraseña */
+  const [password, setPassword] = useState('');
 
   // Confirmación
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -137,8 +140,6 @@ export default function Usuarios() {
     try {
       if (!window.electronAPI) return;
       const userList = await window.electronAPI.getUsers();
-      // Ajustamos userList según tu BD (si maneja "activo" o no)
-      // Forzamos "activo=true" si tu BD no lo maneja
       const mapped = (userList || []).map((u: any) => ({
         ...u,
         activo: true
@@ -158,6 +159,8 @@ export default function Usuarios() {
     setUsername('');
     setRole('trabajador');
     setActivo(true);
+    /** ★ LIMPIAMOS EL PASSWORD AL CREAR */
+    setPassword('');
     setOpenModal(true);
   }
 
@@ -167,6 +170,8 @@ export default function Usuarios() {
     setUsername(user.username);
     setRole(user.role);
     setActivo(user.activo);
+    /** ★ LIMPIAMOS EL PASSWORD AL EDITAR (opcional) */
+    setPassword('');
     setOpenModal(true);
   }
 
@@ -177,6 +182,7 @@ export default function Usuarios() {
     setUsername('');
     setRole('trabajador');
     setActivo(true);
+    setPassword('');
   }
 
   // ================== Confirm Dialog Helpers ==================
@@ -212,8 +218,8 @@ export default function Usuarios() {
             const result = await window.electronAPI.createUser({
               username,
               role,
-              // si quieres manejar "activo" en DB:
-              activo
+              activo,
+              password, // ★ Enviamos el password
             });
             if (!result?.success) {
               openAlert('No se pudo crear el usuario.');
@@ -224,7 +230,8 @@ export default function Usuarios() {
               id: editingUser.id,
               username,
               role,
-              activo
+              activo,
+              password, // ★ Enviamos el password si se desea actualizar
             });
             if (!result?.success) {
               openAlert('No se pudo actualizar el usuario.');
@@ -385,6 +392,16 @@ export default function Usuarios() {
             fullWidth
             autoFocus
           />
+
+          {/* ★ CAMPO DE CONTRASEÑA */}
+          <TextField
+            label="Contraseña (opcional)"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            fullWidth
+          />
+
           <Select
             value={role}
             onChange={(e) => setRole(e.target.value as string)}
