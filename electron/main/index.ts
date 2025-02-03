@@ -1,16 +1,23 @@
 import { app, BrowserWindow, Menu } from 'electron';
-import updater from 'electron-updater';
-import log from 'electron-log';
-
+// ❌ En ESM, no se permite: import { autoUpdater } from 'electron-updater';
+import updater from 'electron-updater'; // <-- import default
 const { autoUpdater } = updater;
 
-// Asignamos el logger de electron-log al autoUpdater
+// ===== IMPORTAMOS electron-log =====
+import log from 'electron-log';
+
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { setupIpcHandlers } from './ipcHandlers';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// ===== Configuramos al logger del autoUpdater =====
 autoUpdater.logger = log;
+// Evita el error TS "transports no existe" forzando a any
+(log as any).transports.file.level = 'info';
 
-// Configuramos el nivel de logs en archivo
-log.transports.file.level = 'info';
-
-// Ejemplo de crear la ventana principal
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1000,
@@ -18,7 +25,8 @@ function createWindow() {
     backgroundColor: '#0d1117',
     show: true,
     webPreferences: {
-      contextIsolation: true
+      contextIsolation: true,
+      preload: join(__dirname, '../preload/preload.mjs'),
     },
   });
 
@@ -26,48 +34,31 @@ function createWindow() {
     Menu.setApplicationMenu(null);
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    mainWindow.loadFile('dist/index.html');
+    mainWindow.loadFile(join(__dirname, '../../dist/index.html'));
   }
 
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.show();
-    log.info('Invocando autoUpdater.checkForUpdatesAndNotify...');
+    // ===== Checamos updates y se logueará en main.log =====
     autoUpdater.checkForUpdatesAndNotify();
   });
 }
 
-// Escuchamos los eventos del autoUpdater con logs para depuración
-autoUpdater.on('checking-for-update', () => {
-  log.info('AutoUpdater: checking-for-update');
+// Manejo de eventos de autoUpdater
+autoUpdater.on('update-available', () => {
+  console.log('Nueva versión disponible. Descargando...');
 });
 
-autoUpdater.on('update-available', (info) => {
-  log.info('AutoUpdater: update-available', info);
+autoUpdater.on('update-not-available', () => {
+  console.log('No hay actualizaciones disponibles.');
 });
 
-autoUpdater.on('update-not-available', (info) => {
-  log.info('AutoUpdater: update-not-available', info);
+autoUpdater.on('update-downloaded', () => {
+  console.log('Actualización descargada. Se aplicará al reiniciar la app.');
+  // autoUpdater.quitAndInstall();
 });
 
-autoUpdater.on('download-progress', (progressObj) => {
-  log.info(
-    `AutoUpdater: download-progress -> Velocidad: ${progressObj.bytesPerSecond} bps, ` +
-    `Progreso: ${progressObj.percent.toFixed(2)}% ` +
-    `(${progressObj.transferred}/${progressObj.total} bytes)`
-  );
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  log.info('AutoUpdater: update-downloaded', info);
-  log.info('La actualización se instalará al reiniciar o forzar con quitAndInstall().');
-  // autoUpdater.quitAndInstall(); // Si quieres forzar la instalación inmediata
-});
-
-autoUpdater.on('error', (err) => {
-  log.error('AutoUpdater Error:', err);
-});
-
-// Arrancamos la aplicación
 app.whenReady().then(() => {
   createWindow();
+  setupIpcHandlers();
 });
