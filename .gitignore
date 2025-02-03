@@ -7,12 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencias y builds
 node_modules
 dist
 dist-ssr
 dist-electron
 release
 *.local
+
+# Archivos de entornos locales
+.env
 
 # Editor directories and files
 .vscode/.debug.env
@@ -24,10 +28,12 @@ release
 *.sln
 *.sw?
 
-#lockfile
+# Lockfiles
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
-/test-results/
-/playwright-report/
-/playwright/.cache/
+
+# Directorios o archivos de test/reporte
+/	test-results/
+/	playwright-report/
+/	playwright/.cache/

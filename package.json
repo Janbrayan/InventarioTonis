@@ -1,6 +1,6 @@
 {
   "name": "electron-vite-react",
-  "version": "2.2.5",
+  "version": "2.2.7"
   "main": "dist-electron/main/index.js",
   "description": "Electron Vite React boilerplate.",
   "author": "草鞋没号 <308487730@qq.com>",
@@ -86,7 +86,9 @@
         "provider": "github",
         "owner": "Janbrayan",
         "repo": "InventarioTonis",
-        "releaseType": "release"
+        "releaseType": "release",
+        "private": true
+
       }
     ]
   }
