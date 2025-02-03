@@ -141,8 +141,10 @@ export default function Layout() {
           }
         }
       } else {
-        // Acumular caracteres
-        buffer += e.key;
+        // SOLO acumulamos si es alfanumérico. Ignora teclas como Shift, Alt, F1, flechas, etc.
+        if (/^[a-zA-Z0-9]$/.test(e.key)) {
+          buffer += e.key;
+        }
       }
     };
 
@@ -156,7 +158,7 @@ export default function Layout() {
     <div className="dashboard-container">
       {/* Barra lateral */}
       <aside className="sidebar">
-        {/* Aquí agregamos la versión 2.2.3 visible */}
+        {/* Versión visible */}
         <h2 className="sidebar-title">Admin Panel v2.2.4</h2>
 
         <nav>
