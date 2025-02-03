@@ -159,7 +159,7 @@ export default function Layout() {
       {/* Barra lateral */}
       <aside className="sidebar">
         {/* Versión visible */}
-        <h2 className="sidebar-title">Admin Panel v2.3.2</h2>
+        <h2 className="sidebar-title">Admin Panel v2.3.3</h2>
 
         <nav>
           <ul className="menu-list">
