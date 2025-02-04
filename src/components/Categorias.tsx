@@ -285,12 +285,31 @@ export default function Categorias() {
   }
 
   return (
-    <Box sx={{ p: 3, width: '100%' }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
+    <Box
+      sx={{
+        // Ajustamos márgenes y padding para que sea responsivo
+        p: { xs: 2, sm: 3 },
+        width: '100%'
+      }}
+    >
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: 'bold', color: '#212529' }}
+      >
         Gestión de Categorías
       </Typography>
 
-      <Card sx={{ borderRadius: 2, boxShadow: 3, backgroundColor: '#1c2430', color: '#fff' }}>
+      <Card
+        sx={{
+          borderRadius: 2,
+          boxShadow: 3,
+          backgroundColor: '#1c2430',
+          color: '#fff',
+          // Aseguramos márgenes responsivas
+          m: { xs: 0, md: 2 }
+        }}
+      >
         <CardHeader
           title={
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -317,7 +336,12 @@ export default function Categorias() {
         <CardContent sx={{ p: 0 }}>
           <TableContainer
             component={Paper}
-            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+            sx={{
+              borderRadius: '0 0 8px 8px',
+              backgroundColor: '#2b3640',
+              // Permite scroll horizontal en pantallas pequeñas
+              overflowX: 'auto'
+            }}
           >
             <Table>
               <TableHead

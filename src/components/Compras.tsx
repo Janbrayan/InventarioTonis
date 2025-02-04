@@ -308,8 +308,6 @@ function DetalleModal({
             type="number"
             value={precioUnit === 0 ? '' : precioUnit}
             onChange={(e) => setPrecioUnit(Number(e.target.value) || 0)}
-            // Podrías poner readOnly si quieres que el usuario no lo cambie manualmente:
-            // inputProps={{ readOnly: tipoCont === 'kilos' }}
           />
 
           <FormControl>
@@ -494,11 +492,9 @@ export default function Compras() {
       } else if (d.tipoContenedor === 'caja') {
         sub = d.cantidad * d.precioUnitario;
       } else if (d.tipoContenedor === 'kilos') {
-        // Igual que "unidad": sub = cantidad * precioUnitario
         sub = d.cantidad * d.precioUnitario;
       } else {
-        // "unidad"
-        sub = d.cantidad * d.precioUnitario;
+        sub = d.cantidad * d.precioUnitario; // unidad
       }
       return acc + sub;
     }, 0);
@@ -508,11 +504,11 @@ export default function Compras() {
   function handleSaveCompra() {
     if (proveedorId <= 0) {
       setError('Debes seleccionar un Proveedor antes de guardar.');
-      return; // No cierra modal
+      return;
     }
     if (detalles.length === 0) {
       setError('Debes agregar al menos un Producto antes de guardar.');
-      return; // No cierra modal
+      return;
     }
 
     const total = calcularTotal();
@@ -611,7 +607,13 @@ export default function Compras() {
   }
 
   return (
-    <Box sx={{ p: 3, width: '100%' }}>
+    <Box
+      sx={{
+        // Se ajusta mejor a pantallas pequeñas
+        p: { xs: 2, sm: 3 },
+        width: '100%'
+      }}
+    >
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
         Compras
       </Typography>
@@ -643,7 +645,12 @@ export default function Compras() {
         <CardContent sx={{ p: 0 }}>
           <TableContainer
             component={Paper}
-            sx={{ borderRadius: '0 0 8px 8px', backgroundColor: '#2b3640' }}
+            sx={{
+              borderRadius: '0 0 8px 8px',
+              backgroundColor: '#2b3640',
+              // Permite scroll horizontal en pantallas reducidas
+              overflowX: 'auto'
+            }}
           >
             <Table>
               <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
@@ -754,7 +761,8 @@ export default function Compras() {
             <AddIcon /> Agregar Producto
           </Button>
 
-          <TableContainer component={Paper} sx={{ mt: 2 }}>
+          {/* Tabla de detalles en el modal */}
+          <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -789,7 +797,6 @@ export default function Compras() {
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = upc > 0 ? d.precioUnitario / upc : 0;
                   } else if (d.tipoContenedor === 'kilos') {
-                    // Se comporta como 'unidad'
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = d.precioUnitario;
                   } else {
@@ -886,7 +893,7 @@ export default function Compras() {
           Detalles de la Compra #{viewCompraId}
         </DialogTitle>
         <DialogContent>
-          <TableContainer component={Paper}>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -918,15 +925,15 @@ export default function Compras() {
                   } else if (d.tipoContenedor === 'kilos') {
                     sub = d.cantidad * d.precioUnitario;
                   } else {
-                    // 'unidad'
                     sub = d.cantidad * d.precioUnitario;
                   }
 
-                  const piezas = d.tipoContenedor === 'unidad'
-                    ? d.cantidad
-                    : d.tipoContenedor === 'kilos'
+                  const piezas =
+                    d.tipoContenedor === 'unidad'
                       ? d.cantidad
-                      : d.cantidad * upc;
+                      : d.tipoContenedor === 'kilos'
+                        ? d.cantidad
+                        : d.cantidad * upc;
 
                   const precioPorPieza = (d as any).precioPorPieza
                     ? (d as any).precioPorPieza.toFixed(2)
