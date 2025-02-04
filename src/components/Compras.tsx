@@ -269,7 +269,18 @@ function DetalleModal({
         BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Agregar Producto</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <DialogContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            mt: 1,
+            // Scroll horizontal en pantallas pequeñas si hace falta
+            overflowX: 'auto',
+            // Para evitar que en pantallas muy chicas se salga del viewport
+            maxHeight: { xs: '80vh', sm: 'none' },
+          }}
+        >
           <FormControl fullWidth>
             <InputLabel id="prod-select-label">Producto</InputLabel>
             <Select
@@ -652,7 +663,17 @@ export default function Compras() {
               overflowX: 'auto'
             }}
           >
-            <Table>
+            <Table
+              // Tamaño pequeño y estilo para celdas más compactas
+              size="small"
+              sx={{
+                '& thead th, & tbody td': {
+                  whiteSpace: 'nowrap',       // Evita saltos de línea
+                  fontSize: '0.85rem',        // Letra un poco más chica
+                  padding: '4px 8px',         // Padding reducido
+                },
+              }}
+            >
               <TableHead sx={{ backgroundColor: '#25303a', '& th': { color: '#fff' } }}>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -720,7 +741,17 @@ export default function Compras() {
         BackdropProps={{ style: { backdropFilter: 'blur(6px)' } }}
       >
         <DialogTitle sx={{ fontWeight: 'bold' }}>Crear Compra</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <DialogContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            mt: 1,
+            // Scroll horizontal en pantallas pequeñas
+            overflowX: 'auto',
+            maxHeight: { xs: '80vh', sm: 'none' },
+          }}
+        >
           <FormControl fullWidth>
             <InputLabel id="prov-label">Proveedor</InputLabel>
             <Select
@@ -762,8 +793,23 @@ export default function Compras() {
           </Button>
 
           {/* Tabla de detalles en el modal */}
-          <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
-            <Table size="small">
+          <TableContainer
+            component={Paper}
+            sx={{
+              mt: 2,
+              overflowX: 'auto',
+            }}
+          >
+            <Table
+              size="small"
+              sx={{
+                '& thead th, & tbody td': {
+                  whiteSpace: 'nowrap',
+                  fontSize: '0.85rem',
+                  padding: '4px 8px',
+                },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   <TableCell>Producto</TableCell>
@@ -892,9 +938,24 @@ export default function Compras() {
         <DialogTitle sx={{ fontWeight: 'bold' }}>
           Detalles de la Compra #{viewCompraId}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent
+          sx={{
+            // Scroll horizontal en pantallas pequeñas
+            overflowX: 'auto',
+            maxHeight: { xs: '80vh', sm: 'none' },
+          }}
+        >
           <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                '& thead th, & tbody td': {
+                  whiteSpace: 'nowrap',
+                  fontSize: '0.85rem',
+                  padding: '4px 8px',
+                },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
