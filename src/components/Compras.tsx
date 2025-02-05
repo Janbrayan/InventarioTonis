@@ -30,14 +30,18 @@ import {
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-/** =============== Tipos de datos básicos =============== */
 interface Provider {
   id: number;
   nombre: string;
 }
+
+/** Importante: asegurarse que Product tenga precioCompra y precioVenta
+    para poder precargarlos al seleccionar o escanear. */
 interface Product {
   id: number;
   nombre: string;
+  precioCompra?: number; // <-- Lo necesitamos
+  precioVenta?: number;  // <-- para precargar
 }
 
 type TipoContenedor = 'unidad' | 'caja' | 'paquete' | 'kilos';
@@ -52,6 +56,7 @@ interface DetalleCompra {
   fechaCaducidad?: string;
   precioVenta?: number;
 }
+
 interface Purchase {
   id?: number;
   proveedorId: number;
@@ -62,20 +67,16 @@ interface Purchase {
   detalles?: DetalleCompra[];
 }
 
-/** =========================================================
- *   Generar automáticamente un ID de Lote (simple ejemplo)
- * ========================================================= */
 function generateRandomLote(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * Math.random() * chars.length));
   }
-  // Por ejemplo: "LOTE-AB12CD"
   return 'LOTE-' + result;
 }
 
-/** =============== Diálogo de confirmación genérico =============== */
+/** =============== Diálogo de Confirmación =============== */
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -112,7 +113,7 @@ function ConfirmDialog({
   );
 }
 
-/** =============== Diálogo de error (reemplaza alert) =============== */
+/** =============== Diálogo de Error =============== */
 interface ErrorDialogProps {
   open: boolean;
   errorMessage: string;
@@ -140,13 +141,13 @@ function ErrorDialog({ open, errorMessage, onClose }: ErrorDialogProps) {
   );
 }
 
-/** =============== Submodal para llenar datos del producto a agregar =============== */
+/** =============== Submodal para Agregar Detalle =============== */
 interface DetalleModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (detalle: DetalleCompra) => void;
   products: Product[];
-  /** Si quieres preseleccionar un producto en el submodal */
+  /** Producto sugerido (por escaneo), si aplica */
   preselectedProductId?: number | null;
 }
 
@@ -157,57 +158,86 @@ function DetalleModal({
   products,
   preselectedProductId,
 }: DetalleModalProps) {
+  // Campos básicos
   const [productoId, setProductoId] = useState<number>(0);
   const [cantidad, setCantidad] = useState<number>(1);
+
+  // Se usará para precio de compra (desde BD)
   const [precioUnit, setPrecioUnit] = useState<number>(0);
 
-  /** Ajustamos para que incluya 'kilos' */
   const [tipoCont, setTipoCont] = useState<TipoContenedor>('unidad');
-
-  // Nuevo state para el caso "kilos": total en pesos
   const [totalKilos, setTotalKilos] = useState<number>(0);
-
   const [upc, setUpc] = useState<number>(1);
+
   const [lote, setLote] = useState('');
   const [caducidad, setCaducidad] = useState('');
+
+  // Se usará para precio de venta (desde BD)
   const [precioVenta, setPrecioVenta] = useState<number>(0);
 
-  // Estado para manejar error interno en este submodal
+  // Para mostrar errores en este submodal
   const [error, setError] = useState('');
 
-  /** Para cambiar las etiquetas según el tipoContenedor */
-  const getPrecioUnitLabel = () => {
-    switch (tipoCont) {
-      case 'caja':
-        return 'Precio por Caja';
-      case 'paquete':
-        return 'Precio por Paquete';
-      case 'kilos':
-        return 'Precio por Kilo';
-      default:
-        return 'Precio Unitario'; // 'unidad'
+  /** Al abrir el submodal, inicializamos valores "básicos", excepto los precios
+   *  (que se cargarán cuando cambie productoId).
+   */
+  useEffect(() => {
+    if (open) {
+      setProductoId(preselectedProductId || 0);
+      setCantidad(1);
+      setTipoCont('unidad');
+      setUpc(1);
+      setCaducidad('');
+      setLote(generateRandomLote());
+      setError('');
+      setTotalKilos(0);
+      // Dejamos precioUnit y precioVenta en 0 al inicio;
+      // se setearán en el siguiente useEffect cuando cambie productoId
+      setPrecioUnit(0);
+      setPrecioVenta(0);
     }
-  };
+  }, [open, preselectedProductId]);
 
-  const getUpcLabel = () => {
-    switch (tipoCont) {
-      case 'caja':
-        return 'Unid x Caja';
-      case 'paquete':
-        return 'Unid x Paquete';
-      default:
-        return 'Unid x Cont.';
+  /** Cuando el usuario elige un producto en el <Select>,
+   *  o llega un preselectedProductId (escaneo),
+   *  buscaremos en 'products' su precioCompra y precioVenta.
+   */
+  useEffect(() => {
+    if (productoId) {
+      const found = products.find((p) => p.id === productoId);
+      if (found) {
+        // Precios que vienen de la BD (productService)
+        setPrecioUnit(found.precioCompra ?? 0);
+        setPrecioVenta(found.precioVenta ?? 0);
+      } else {
+        // Si no existe, reseteamos
+        setPrecioUnit(0);
+        setPrecioVenta(0);
+      }
+    } else {
+      // Sin producto seleccionado
+      setPrecioUnit(0);
+      setPrecioVenta(0);
     }
-  };
+  }, [productoId, products]);
+
+  /** Si es tipo "kilos", calculamos precioUnit
+   *  con base en totalKilos / cantidad.
+   */
+  useEffect(() => {
+    if (tipoCont === 'kilos' && cantidad > 0 && totalKilos > 0) {
+      const newPrice = totalKilos / cantidad;
+      setPrecioUnit(Number(newPrice.toFixed(2)));
+    }
+  }, [tipoCont, cantidad, totalKilos]);
 
   function handleConfirm() {
-    // Validaciones
     if (!productoId) {
       setError('Selecciona un producto.');
       return;
     }
     if (cantidad <= 0) {
-      setError('Cantidad debe ser mayor a 0.');
+      setError('La cantidad debe ser mayor a 0.');
       return;
     }
     if (precioUnit <= 0) {
@@ -215,6 +245,7 @@ function DetalleModal({
       return;
     }
 
+    // Construimos el detalle a guardar
     const detalle: DetalleCompra = {
       productoId,
       cantidad,
@@ -229,31 +260,26 @@ function DetalleModal({
     onClose();
   }
 
-  // Al abrir el submodal, reseteamos (y generamos lote automáticamente)
-  useEffect(() => {
-    if (open) {
-      setProductoId(preselectedProductId || 0);
-      setCantidad(1);
-      setPrecioUnit(0);
-      setTipoCont('unidad');
-      setUpc(1);
-      setCaducidad('');
-      setPrecioVenta(0);
-      setLote(generateRandomLote());
-      setError('');
-      setTotalKilos(0);
+  // Etiqueta dinámica para precio unitario
+  const getPrecioUnitLabel = () => {
+    switch (tipoCont) {
+      case 'caja':
+        return 'Precio por Caja';
+      case 'paquete':
+        return 'Precio por Paquete';
+      case 'kilos':
+        return 'Precio por Kilo';
+      default:
+        return 'Precio Unitario'; // 'unidad'
     }
-  }, [open, preselectedProductId]);
+  };
 
-  // Si es "kilos", al cambiar "cantidad" o "totalKilos", calculamos precioUnit = totalKilos / cantidad
-  useEffect(() => {
-    if (tipoCont === 'kilos') {
-      if (cantidad > 0 && totalKilos > 0) {
-        const newPrice = totalKilos / cantidad;
-        setPrecioUnit(Number(newPrice.toFixed(2)));
-      }
-    }
-  }, [tipoCont, cantidad, totalKilos]);
+  // Etiqueta dinámica para "Unidades por Contenedor"
+  const getUpcLabel = () => {
+    if (tipoCont === 'caja') return 'Unid x Caja';
+    if (tipoCont === 'paquete') return 'Unid x Paquete';
+    return 'Unid x Cont.';
+  };
 
   function handleCloseError() {
     setError('');
@@ -275,12 +301,11 @@ function DetalleModal({
             flexDirection: 'column',
             gap: 2,
             mt: 1,
-            // Scroll horizontal en pantallas pequeñas si hace falta
             overflowX: 'auto',
-            // Para evitar que en pantallas muy chicas se salga del viewport
             maxHeight: { xs: '80vh', sm: 'none' },
           }}
         >
+          {/* Selección de producto */}
           <FormControl fullWidth>
             <InputLabel id="prod-select-label">Producto</InputLabel>
             <Select
@@ -298,6 +323,7 @@ function DetalleModal({
             </Select>
           </FormControl>
 
+          {/* Cantidad */}
           <TextField
             label="Cantidad"
             type="number"
@@ -305,6 +331,7 @@ function DetalleModal({
             onChange={(e) => setCantidad(Number(e.target.value) || 0)}
           />
 
+          {/* Si es 'kilos', mostramos "Total (Pesos)" */}
           {tipoCont === 'kilos' && (
             <TextField
               label="Total (Pesos)"
@@ -314,6 +341,7 @@ function DetalleModal({
             />
           )}
 
+          {/* PRECIO UNITARIO (compra) */}
           <TextField
             label={getPrecioUnitLabel()}
             type="number"
@@ -321,6 +349,7 @@ function DetalleModal({
             onChange={(e) => setPrecioUnit(Number(e.target.value) || 0)}
           />
 
+          {/* Tipo de contenedor */}
           <FormControl>
             <InputLabel id="tipoCont-label">Tipo</InputLabel>
             <Select
@@ -337,6 +366,7 @@ function DetalleModal({
             </Select>
           </FormControl>
 
+          {/* Unid x Cont. SOLO si es caja o paquete */}
           {(tipoCont === 'caja' || tipoCont === 'paquete') && (
             <TextField
               label={getUpcLabel()}
@@ -347,11 +377,14 @@ function DetalleModal({
             />
           )}
 
+          {/* Lote */}
           <TextField
             label="Lote"
             value={lote}
             onChange={(e) => setLote(e.target.value)}
           />
+
+          {/* Fecha de caducidad */}
           <TextField
             label="Caducidad"
             type="date"
@@ -359,6 +392,8 @@ function DetalleModal({
             onChange={(e) => setCaducidad(e.target.value)}
             InputLabelProps={{ shrink: true }}
           />
+
+          {/* PRECIO VENTA */}
           <TextField
             label="Precio de Venta"
             type="number"
@@ -374,7 +409,7 @@ function DetalleModal({
         </DialogActions>
       </Dialog>
 
-      {/* Error interno del submodal */}
+      {/* Diálogo de error interno del submodal */}
       <ErrorDialog
         open={!!error}
         errorMessage={error}
@@ -384,7 +419,9 @@ function DetalleModal({
   );
 }
 
-/** =============== Componente principal de Compras =============== */
+/** =====================================================
+ *      Componente principal de COMPRAS
+ * ===================================================== */
 export default function Compras() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -394,7 +431,7 @@ export default function Compras() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal para Crear Compra
+  // Modal Crear Compra
   const [openModal, setOpenModal] = useState(false);
 
   // Datos encabezado de la compra
@@ -407,21 +444,21 @@ export default function Compras() {
   const [openDetalleModal, setOpenDetalleModal] = useState(false);
   const [preselectedProductId, setPreselectedProductId] = useState<number | null>(null);
 
-  // Confirm Dialog
+  // ConfirmDialog (compra final)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  // Modal ver detalles (compra ya existente)
+  // Modal para ver detalles de una compra ya guardada
   const [openDetalles, setOpenDetalles] = useState(false);
   const [detallesCompra, setDetallesCompra] = useState<any[]>([]);
   const [viewCompraId, setViewCompraId] = useState<number | null>(null);
 
-  // Estado de error general (para reemplazar alerts)
+  // Error general
   const [error, setError] = useState('');
 
-  // Al montar, cargar data
+  // Cargar listas (compras, proveedores, productos) al montar
   useEffect(() => {
     fetchAll();
   }, []);
@@ -432,7 +469,7 @@ export default function Compras() {
       const [compList, provList, prodList] = await Promise.all([
         window.electronAPI.getPurchases(),
         window.electronAPI.getProviders(),
-        window.electronAPI.getProducts(),
+        window.electronAPI.getProducts(), // Este debe proveer precioCompra y precioVenta
       ]);
       setCompras(compList || []);
       setProviders(provList || []);
@@ -445,36 +482,40 @@ export default function Compras() {
     }
   }
 
-  // Revisar si vienes de un escaneo => openModal + openDetalle
+  // Detectamos si venimos de un escaneo => openModal + openDetalle con productId
   useEffect(() => {
     const st: any = location.state;
     if (st?.openModal === 'createCompra') {
       handleOpenCreate();
       if (st.openDetalle === true && typeof st.productId === 'number') {
+        // Después de un pequeño delay (para que abra primero el modal principal)
         setTimeout(() => {
           setPreselectedProductId(st.productId);
           setOpenDetalleModal(true);
         }, 200);
       }
+      // Limpia el state de la URL
       navigate(location.pathname, { replace: true });
     }
   }, [location.state, navigate]);
 
   function handleOpenCreate() {
-    setProveedorId(0);
-    setFecha(new Date().toISOString().substring(0, 10));
-    setObservaciones('');
-    setDetalles([]);
-    setOpenModal(true);
+    // Solo si no está abierto
+    if (!openModal) {
+      setProveedorId(0);
+      setFecha(new Date().toISOString().substring(0, 10));
+      setObservaciones('');
+      setDetalles([]);
+      setOpenModal(true);
+    }
   }
+
   function handleCloseModal() {
     setOpenModal(false);
   }
 
+  // Abre el submodal sin reiniciar la compra
   function handleOpenDetalleModal() {
-    if (!openModal) {
-      handleOpenCreate();
-    }
     setPreselectedProductId(null);
     setOpenDetalleModal(true);
   }
@@ -482,10 +523,12 @@ export default function Compras() {
     setOpenDetalleModal(false);
   }
 
+  /** Cuando el submodal "onSave" => agrega un Detalle al array */
   function handleAddDetalle(detalle: DetalleCompra) {
     setDetalles((prev) => [...prev, detalle]);
   }
 
+  /** Eliminar un renglón */
   function removeRenglonDetalle(idx: number) {
     setDetalles((prev) => {
       const copy = [...prev];
@@ -494,6 +537,7 @@ export default function Compras() {
     });
   }
 
+  /** Calcula total de la compra */
   function calcularTotal(): number {
     return detalles.reduce((acc, d) => {
       const upc = d.unidadesPorContenedor ?? 1;
@@ -505,13 +549,14 @@ export default function Compras() {
       } else if (d.tipoContenedor === 'kilos') {
         sub = d.cantidad * d.precioUnitario;
       } else {
-        sub = d.cantidad * d.precioUnitario; // unidad
+        // 'unidad'
+        sub = d.cantidad * d.precioUnitario;
       }
       return acc + sub;
     }, 0);
   }
 
-  /** NO CERRAMOS el modal si hay error: permitimos corregir */
+  /** Guardar la Compra (confirmDialog) */
   function handleSaveCompra() {
     if (proveedorId <= 0) {
       setError('Debes seleccionar un Proveedor antes de guardar.');
@@ -531,10 +576,11 @@ export default function Compras() {
       })
       .join('\n');
 
-    const message = `Información de los productos a comprar:\n\n${productSummary}\n\n` +
-      `Total: $${total.toFixed(2)}\n\n¿Deseas REALIZAR esta compra?`;
+    const message =
+      `Información de los productos a comprar:\n\n` +
+      productSummary +
+      `\n\nTotal: $${total.toFixed(2)}\n\n¿Deseas REALIZAR esta compra?`;
 
-    // La acción real de guardar se hace hasta que el usuario confirma
     const action = async () => {
       try {
         const purchaseData = {
@@ -548,8 +594,7 @@ export default function Compras() {
         if (!resp?.success) {
           setError('No se pudo crear la compra.');
         } else {
-          // Al confirmar y guardar con éxito, cerramos el modal
-          setOpenModal(false);
+          setOpenModal(false); // cierra modal principal
         }
         await fetchAll();
       } catch (err) {
@@ -572,6 +617,7 @@ export default function Compras() {
     setConfirmOpen(false);
   }
 
+  /** Ver detalles de una compra existente */
   async function handleVerDetalles(compraId: number) {
     try {
       setViewCompraId(compraId);
@@ -588,27 +634,6 @@ export default function Compras() {
     setViewCompraId(null);
   }
 
-  function handleDeleteCompra(compra: Purchase) {
-    openConfirmDialog(
-      'Confirmar eliminación',
-      `¿Deseas ELIMINAR la compra #${compra.id}?`,
-      async () => {
-        try {
-          if (!compra.id) return;
-          const resp = await window.electronAPI.deletePurchase(compra.id);
-          if (!resp?.success) {
-            setError('No se pudo eliminar la compra.');
-          }
-          await fetchAll();
-        } catch (err) {
-          console.error('Error deletePurchase:', err);
-        } finally {
-          closeConfirmDialog();
-        }
-      }
-    );
-  }
-
   function handleCloseError() {
     setError('');
   }
@@ -620,11 +645,10 @@ export default function Compras() {
   return (
     <Box
       sx={{
-        // Se ajusta a pantallas pequeñas y a 1366px de ancho máximo
         p: { xs: 2, sm: 3 },
         width: '100%',
-        maxWidth: '1366px',  // <= Ajuste para pantallas 1366
-        margin: '0 auto',    // Centra el contenido
+        maxWidth: '1366px',
+        margin: '0 auto',
       }}
     >
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
@@ -661,7 +685,6 @@ export default function Compras() {
             sx={{
               borderRadius: '0 0 8px 8px',
               backgroundColor: '#2b3640',
-              // Permite scroll horizontal en pantallas reducidas
               overflowX: 'auto'
             }}
           >
@@ -748,11 +771,11 @@ export default function Compras() {
             flexDirection: 'column',
             gap: 2,
             mt: 1,
-            // Scroll horizontal en pantallas pequeñas
             overflowX: 'auto',
             maxHeight: { xs: '80vh', sm: 'none' },
           }}
         >
+          {/* Proveedor */}
           <FormControl fullWidth>
             <InputLabel id="prov-label">Proveedor</InputLabel>
             <Select
@@ -770,6 +793,7 @@ export default function Compras() {
             </Select>
           </FormControl>
 
+          {/* Fecha */}
           <TextField
             label="Fecha"
             type="date"
@@ -779,6 +803,7 @@ export default function Compras() {
             fullWidth
           />
 
+          {/* Observaciones */}
           <TextField
             label="Observaciones"
             value={observaciones}
@@ -793,14 +818,8 @@ export default function Compras() {
             <AddIcon /> Agregar Producto
           </Button>
 
-          {/* Tabla de detalles en el modal */}
-          <TableContainer
-            component={Paper}
-            sx={{
-              mt: 2,
-              overflowX: 'auto',
-            }}
-          >
+          {/* Tabla de detalles añadidos */}
+          <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
             <Table
               size="small"
               sx={{
@@ -829,14 +848,14 @@ export default function Compras() {
               </TableHead>
               <TableBody>
                 {detalles.map((d, idx) => {
-                  const prodName =
-                    products.find((pp) => pp.id === d.productoId)?.nombre ||
-                    `ID=${d.productoId}`;
+                  const prod = products.find((pp) => pp.id === d.productoId);
+                  const prodName = prod?.nombre || `ID=${d.productoId}`;
 
                   let sub = 0;
                   let precioPorPieza = 0;
                   const upc = d.unidadesPorContenedor ?? 1;
 
+                  // Lógica para calcular Subtotal y Precio x Pieza
                   if (d.tipoContenedor === 'paquete') {
                     sub = d.cantidad * upc * d.precioUnitario;
                     precioPorPieza = d.precioUnitario;
@@ -847,7 +866,7 @@ export default function Compras() {
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = d.precioUnitario;
                   } else {
-                    // 'unidad'
+                    // unidad
                     sub = d.cantidad * d.precioUnitario;
                     precioPorPieza = d.precioUnitario;
                   }
@@ -907,6 +926,7 @@ export default function Compras() {
             </Table>
           </TableContainer>
 
+          {/* Total de la compra */}
           <Typography variant="h6" sx={{ mt: 2, textAlign: 'right' }}>
             Total de la compra: ${calcularTotal().toFixed(2)}
           </Typography>
@@ -919,7 +939,7 @@ export default function Compras() {
         </DialogActions>
       </Dialog>
 
-      {/* Submodal de detalle */}
+      {/* Submodal de Detalle (Seleccionar producto y precios) */}
       <DetalleModal
         open={openDetalleModal}
         onClose={handleCloseDetalleModal}
@@ -941,7 +961,6 @@ export default function Compras() {
         </DialogTitle>
         <DialogContent
           sx={{
-            // Scroll horizontal en pantallas pequeñas
             overflowX: 'auto',
             maxHeight: { xs: '80vh', sm: 'none' },
           }}
@@ -987,6 +1006,7 @@ export default function Compras() {
                   } else if (d.tipoContenedor === 'kilos') {
                     sub = d.cantidad * d.precioUnitario;
                   } else {
+                    // unidad
                     sub = d.cantidad * d.precioUnitario;
                   }
 
@@ -997,9 +1017,8 @@ export default function Compras() {
                         ? d.cantidad
                         : d.cantidad * upc;
 
-                  const precioPorPieza = (d as any).precioPorPieza
-                    ? (d as any).precioPorPieza.toFixed(2)
-                    : '—';
+                  // precioPorPieza no se guarda en DB, se calcularía si lo requieres
+                  const precioPorPieza = '—';
 
                   return (
                     <TableRow key={d.id}>
@@ -1007,11 +1026,9 @@ export default function Compras() {
                       <TableCell>{pName}</TableCell>
                       <TableCell>{d.cantidad}</TableCell>
                       <TableCell>${d.precioUnitario}</TableCell>
-                      <TableCell>
-                        {precioPorPieza !== '—' ? `$${precioPorPieza}` : '—'}
-                      </TableCell>
+                      <TableCell>{precioPorPieza}</TableCell>
                       <TableCell>${sub.toFixed(2)}</TableCell>
-                      <TableCell>{d.tipoContenedor || 'unidad'}</TableCell>
+                      <TableCell>{d.tipoContenedor}</TableCell>
                       <TableCell>
                         {(d.tipoContenedor === 'caja' || d.tipoContenedor === 'paquete')
                           ? upc

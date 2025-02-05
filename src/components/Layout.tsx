@@ -47,12 +47,22 @@ export default function Layout() {
    * useEffect global para capturar el escaneo de la pistola lectora.
    * - Acumula caracteres en 'buffer'
    * - Al presionar 'Enter', busca el producto por barcode
+   * - Si pasa 1seg entre pulsaciones, se reinicia 'buffer'
    * - Dependiendo de la ruta actual y si existe o no, realiza distintas acciones.
    */
   useEffect(() => {
     let buffer = '';
+    let lastTime = 0;
 
     const handleKeyDown = async (e: KeyboardEvent) => {
+      const now = Date.now();
+
+      // Si pasó más de 1 segundo entre una tecla y otra, reinicia el buffer
+      if (now - lastTime > 1000) {
+        buffer = '';
+      }
+      lastTime = now;
+
       if (e.key === 'Enter') {
         const scanned = buffer.trim();
         buffer = ''; // Limpia para el siguiente escaneo
@@ -159,7 +169,7 @@ export default function Layout() {
       {/* Barra lateral */}
       <aside className="sidebar">
         {/* Versión visible */}
-        <h2 className="sidebar-title">Admin Panel v2.3.6</h2>
+        <h2 className="sidebar-title">Admin Panel v2.3.7</h2>
 
         <nav>
           <ul className="menu-list">
