@@ -620,9 +620,11 @@ export default function Compras() {
   return (
     <Box
       sx={{
-        // Se ajusta mejor a pantallas pequeñas
+        // Se ajusta a pantallas pequeñas y a 1366px de ancho máximo
         p: { xs: 2, sm: 3 },
-        width: '100%'
+        width: '100%',
+        maxWidth: '1366px',  // <= Ajuste para pantallas 1366
+        margin: '0 auto',    // Centra el contenido
       }}
     >
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#212529' }}>
@@ -664,13 +666,12 @@ export default function Compras() {
             }}
           >
             <Table
-              // Tamaño pequeño y estilo para celdas más compactas
               size="small"
               sx={{
                 '& thead th, & tbody td': {
-                  whiteSpace: 'nowrap',       // Evita saltos de línea
-                  fontSize: '0.85rem',        // Letra un poco más chica
-                  padding: '4px 8px',         // Padding reducido
+                  whiteSpace: 'nowrap',
+                  fontSize: '0.85rem',
+                  padding: '4px 8px',
                 },
               }}
             >
